@@ -1246,16 +1246,124 @@ export async function browsePage(continuation: string): Promise<Page> {
  * Levels are listed low → high quality; the last one is the biggest.
  */
 /** `lengthSeconds` + storyboard spec, straight from the `player` endpoint. */
+/** Desktop Chrome UA — YouTube serves degraded/bot-checked responses to unknown agents. */
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+/** Decode a raw JSON string body (handles \u0026, \/, \" …) without parsing the whole blob. */
+function jsonStringValue(raw: string): string {
+  try {
+    return JSON.parse(`"${raw}"`) as string;
+  } catch {
+    return raw;
+  }
+}
+
+/**
+ * Scrape `ytInitialPlayerResponse` out of the watch page HTML.
+ *
+ * Why this exists: the keyless `youtubei/v1/player` POST that `innertube()` makes is
+ * answered with `playabilityStatus: "UNPLAYABLE"` and **no `storyboards` key at all**
+ * when it comes from a datacentre IP (verified against YouTube from a cloud host:
+ * WEB/MWEB → UNPLAYABLE, WEB_EMBEDDED/TVHTML5 → ERROR, ANDROID/IOS → HTTP 400).
+ * A plain browser-shaped GET of the watch page from the same IP returns
+ * `playabilityStatus: "OK"` together with the full storyboard spec, so this is the
+ * path that actually works in production.
+ */
+async function watchPageMeta(
+  videoId: string,
+): Promise<{ duration: number; storyboardSpec: string }> {
+  const res = await fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}&hl=en`, {
+    headers: {
+      "user-agent": BROWSER_UA,
+      "accept-language": "en-US,en;q=0.9",
+      accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      // Skips the EU consent interstitial that fronts the watch page from some regions.
+      cookie: "SOCS=CAISEwgDEgk0ODE3Nzk3MjQaAmVuIAEaBgiA_LyaBg",
+    },
+  });
+  if (!res.ok) throw new Error(`watch page → HTTP ${res.status}`);
+  const html = await res.text();
+
+  const spec = /"playerStoryboardSpecRenderer":\{"spec":"((?:[^"\\]|\\.)*)"/.exec(html)?.[1] ?? "";
+  const secs = /"lengthSeconds":"(\d+)"/.exec(html)?.[1] ?? "";
+
+  return {
+    duration: Number(secs) || 0,
+    storyboardSpec: spec ? jsonStringValue(spec) : "",
+  };
+}
+
+/** Public InnerTube key the youtube.com web player itself uses. */
+const INNERTUBE_WEB_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
+
+/**
+ * `youtubei/v1/player`, shaped the way the real web player shapes it.
+ *
+ * The generic `innertube()` helper posts without the `key` query param and without
+ * `origin`/`referer`/`x-youtube-client-*`. Verified against YouTube from a cloud host:
+ * that bare form answers `UNPLAYABLE` with no `storyboards` key, while this form
+ * answers `OK` with the full spec for the same video from the same IP.
+ *
+ * Returns `null` instead of throwing so `playerMeta` can fall through to scraping.
+ */
+async function playerRequest(videoId: string): Promise<Json | null> {
+  try {
+    const res = await fetch(`${INNERTUBE}/player?key=${INNERTUBE_WEB_KEY}&prettyPrint=false`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "accept-language": "ar,en;q=0.8",
+        "user-agent": BROWSER_UA,
+        origin: "https://www.youtube.com",
+        referer: `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`,
+        "x-youtube-client-name": "1",
+        "x-youtube-client-version": CLIENT.clientVersion,
+      },
+      body: JSON.stringify({
+        context: { client: CLIENT },
+        videoId,
+        contentCheckOk: true,
+        racyCheckOk: true,
+      }),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as Json;
+  } catch {
+    return null;
+  }
+}
+
 export async function playerMeta(
   videoId: string,
 ): Promise<{ duration: number; storyboardSpec: string }> {
   return cached(`playerMeta:${videoId}`, 6 * 60 * 60 * 1000, async () => {
-    const res = await innertube("player", { videoId });
-    const duration = Number(res?.videoDetails?.lengthSeconds ?? 0) || 0;
-    const storyboardSpec: string =
-      res?.storyboards?.playerStoryboardSpecRenderer?.spec ??
-      collect(res, "playerStoryboardSpecRenderer")[0]?.spec ??
-      "";
+    let duration = 0;
+    let storyboardSpec = "";
+
+    // 1) Browser-shaped InnerTube player call — ~43 KB, and the cheapest source
+    //    that is known to return a storyboard spec from a server IP.
+    const res = await playerRequest(videoId);
+    if (res) {
+      duration = Number(res?.videoDetails?.lengthSeconds ?? 0) || 0;
+      storyboardSpec =
+        res?.storyboards?.playerStoryboardSpecRenderer?.spec ??
+        collect(res, "playerStoryboardSpecRenderer")[0]?.spec ??
+        "";
+    }
+
+    // 2) Watch-page HTML (~1.4 MB) — slower, but survives some of the cases where
+    //    the API call is answered with a bot check.
+    if (!storyboardSpec || !duration) {
+      try {
+        const page = await watchPageMeta(videoId);
+        if (!storyboardSpec) storyboardSpec = page.storyboardSpec;
+        if (!duration) duration = page.duration;
+      } catch {
+        /* keep whatever the API call gave us */
+      }
+    }
+
     return { duration, storyboardSpec };
   });
 }
