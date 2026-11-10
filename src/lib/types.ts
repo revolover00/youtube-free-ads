@@ -77,6 +77,8 @@ export interface StreamData {
 export interface ChannelData {
   id?: string;
   name: string;
+  /** The @handle, including the leading @. */
+  handle?: string;
   avatarUrl: string;
   bannerUrl?: string;
   subscriberCount?: number;

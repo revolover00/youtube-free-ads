@@ -136,12 +136,37 @@ export default function App() {
   const routerNav = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const urlSearch = useRouterState({ select: (s) => s.location.search as Record<string, unknown> });
-  const urlVideoId = pathname === "/watch" ? String(urlSearch?.["v"] ?? "") : "";
+  const urlParams = useRouterState({ select: (s) => s.matches.at(-1)?.params ?? {} }) as Record<
+    string,
+    string | undefined
+  >;
 
-  const urlSearchQ = typeof urlSearch?.["q"] === "string" ? urlSearch["q"] : undefined;
-  const urlSearchId = typeof urlSearch?.["id"] === "string" ? urlSearch["id"] : undefined;
-  const urlSearchK = typeof urlSearch?.["k"] === "string" ? urlSearch["k"] : undefined;
-  const urlSearchV = typeof urlSearch?.["v"] === "string" ? urlSearch["v"] : undefined;
+  /*
+   * YouTube's URL contract. The app originally invented its own scheme
+   * (/search?q=, /channel?id=, /subscriptions, /shorts), which meant any real
+   * YouTube link with the domain swapped 404'd. We now serve YouTube's paths
+   * and keep the originals working as aliases.
+   */
+  const urlVideoId =
+    pathname === "/watch" || pathname.startsWith("/shorts/")
+      ? String(urlParams["id"] ?? urlSearch?.["v"] ?? "")
+      : "";
+
+  const str = (v: unknown): string | undefined => (typeof v === "string" && v ? v : undefined);
+  // /results?search_query= is YouTube's; /search?q= is ours.
+  const urlSearchQ = str(urlSearch?.["search_query"]) ?? str(urlSearch?.["q"]);
+  // /channel/UC... and /@handle are YouTube's; /channel?id= is ours.
+  const urlSearchId =
+    str(urlParams["id"]) ??
+    (str(urlParams["handle"]) ? `@${str(urlParams["handle"])}` : undefined) ??
+    str(urlSearch?.["id"]);
+  const urlSearchK = str(urlSearch?.["k"]);
+  const urlSearchV = str(urlSearch?.["v"]);
+  // /playlist?list= is YouTube's; ?id= is ours.
+  const urlPlaylistId = str(urlSearch?.["list"]) ?? str(urlSearch?.["id"]);
+  // /feed/subscriptions, /feed/you, /feed/history, /feed/playlists
+  const urlFeedName = pathname.startsWith("/feed/") ? str(urlParams["name"]) : undefined;
+  const isHandlePath = pathname.startsWith("/@");
 
   const { route } = useAppStore();
   const setRoute = appStore.setRoute;
@@ -324,27 +349,32 @@ export default function App() {
 
   // Initial URL -> State sync
   useEffect(() => {
-    if (pathname === "/watch" && urlVideoId) {
+    if ((pathname === "/watch" || pathname.startsWith("/shorts/")) && urlVideoId) {
       // Handled by the other useEffect
-    } else if (pathname === "/subscriptions") {
+    } else if (pathname === "/subscriptions" || urlFeedName === "subscriptions") {
       if (route.type !== "subs") setRoute({ type: "subs" });
-    } else if (pathname === "/library") {
-      if (urlSearchK && (route.type !== "library" || route.key !== urlSearchK))
-        setRoute({ type: "library", key: urlSearchK as LibraryKey });
-    } else if (pathname === "/shorts") {
+    } else if (pathname === "/library" || urlFeedName === "you") {
+      const key = urlSearchK ?? (urlFeedName === "you" ? "Library" : undefined);
+      if (key && (route.type !== "library" || route.key !== key))
+        setRoute({ type: "library", key: key as LibraryKey });
+    } else if (urlFeedName === "history" || urlFeedName === "playlists") {
+      const key = urlFeedName === "history" ? "History" : "Playlists";
+      if (route.type !== "library" || route.key !== key)
+        setRoute({ type: "library", key: key as LibraryKey });
+    } else if (pathname === "/shorts" || urlFeedName === "trending") {
       if (route.type !== "home") setRoute({ type: "home" });
       requestAnimationFrame(() =>
         document.getElementById("shorts-shelf")?.scrollIntoView({ behavior: "smooth" }),
       );
     } else if (pathname === "/") {
       if (route.type !== "home") setRoute({ type: "home" });
-    } else if (pathname === "/channel") {
+    } else if (pathname === "/channel" || pathname.startsWith("/channel/") || isHandlePath) {
       if (urlSearchId && (route.type !== "channel" || route.id !== urlSearchId))
         setRoute({ type: "channel", id: urlSearchId });
     } else if (pathname === "/playlist") {
-      if (urlSearchId && (route.type !== "playlist" || route.id !== urlSearchId))
-        setRoute({ type: "playlist", id: urlSearchId });
-    } else if (pathname === "/search") {
+      if (urlPlaylistId && (route.type !== "playlist" || route.id !== urlPlaylistId))
+        setRoute({ type: "playlist", id: urlPlaylistId });
+    } else if (pathname === "/search" || pathname === "/results") {
       if (urlSearchQ && urlSearchQ !== searchQ) setSearchQ(urlSearchQ);
       if (route.type !== "home") setRoute({ type: "home" });
     } else if (pathname === "/policies") {
@@ -356,6 +386,9 @@ export default function App() {
     urlSearchId,
     urlSearchK,
     urlSearchQ,
+    urlPlaylistId,
+    urlFeedName,
+    isHandlePath,
     setRoute,
     setSearchQ,
     route,
@@ -765,7 +798,7 @@ export default function App() {
         const prev: string[] = JSON.parse(localStorage.getItem("yt.searches") || "[]");
         const next = [q.trim(), ...prev.filter((x) => x !== q.trim())].slice(0, 50);
         localStorage.setItem("yt.searches", JSON.stringify(next));
-        void routerNav({ to: "/search", search: { q: q.trim() } });
+        void routerNav({ to: "/results", search: { search_query: q.trim() } });
       } else {
         if (pathname !== "/") void routerNav({ to: "/" });
       }
@@ -1014,7 +1047,7 @@ export default function App() {
     if (!id) return;
     setRoute({ type: "channel", id });
     setActiveNav("");
-    void routerNav({ to: "/channel", search: { id } });
+    void routerNav({ to: "/channel/$id", params: { id } });
     window.scrollTo({ top: 0 });
   };
 
@@ -1022,7 +1055,7 @@ export default function App() {
     if (!id) return;
     setRoute({ type: "playlist", id });
     setActiveNav("");
-    void routerNav({ to: "/playlist", search: { id } });
+    void routerNav({ to: "/playlist", search: { list: id } });
     window.scrollTo({ top: 0 });
   };
 
@@ -1100,7 +1133,7 @@ export default function App() {
       }
     } else if (label === "subscriptions" || label === t("subscriptions")) {
       setSearchQ("");
-      void routerNav({ to: "/subscriptions" });
+      void routerNav({ to: "/feed/$name", params: { name: "subscriptions" } });
       setRoute({ type: "subs" });
       window.scrollTo({ top: 0 });
     } else if (
@@ -1743,7 +1776,7 @@ export default function App() {
           <div className="absolute inset-0 bg-black/60" onClick={() => setCreateOpen(false)} />
           <div className="dropdown-in relative w-full md:w-80 bg-yt-raised rounded-t-2xl md:rounded-2xl border border-yt-border p-3 pb-6 md:pb-3">
             <div className="flex items-center justify-between px-2 py-2">
-              <span className="font-display font-bold">{t("create")}</span>
+              <span className="font-bold">{t("create")}</span>
               <button
                 onClick={() => setCreateOpen(false)}
                 className="w-9 h-9 rounded-full hover:bg-yt-surface grid place-items-center"

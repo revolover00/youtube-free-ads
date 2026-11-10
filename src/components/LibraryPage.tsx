@@ -277,7 +277,7 @@ export default function LibraryPage(props: Props) {
     return (
       <div className="max-w-[1400px] mx-auto px-3 sm:px-6 pt-4 lg:pt-6">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="font-display font-black text-2xl flex items-center gap-3">
+          <h1 className="font-bold text-2xl flex items-center gap-3">
             <ListVideo className="w-7 h-7" /> {t("playlists")}
           </h1>
           <button
@@ -368,7 +368,7 @@ export default function LibraryPage(props: Props) {
   if (normalized === "videos") {
     return (
       <div className="max-w-[1400px] mx-auto px-3 sm:px-6 pt-6">
-        <h1 className="font-display font-black text-2xl mb-6 flex items-center gap-3">
+        <h1 className="font-bold text-2xl mb-6 flex items-center gap-3">
           <meta.icon className="w-7 h-7" /> {meta.title}
         </h1>
         <EmptyState message={meta.empty} />
@@ -380,7 +380,7 @@ export default function LibraryPage(props: Props) {
   if (remoteKey) {
     return (
       <div className="max-w-[1600px] mx-auto px-3 sm:px-6 pt-4 lg:pt-6">
-        <h1 className="font-display font-black text-2xl mb-6 flex items-center gap-3">
+        <h1 className="font-bold text-2xl mb-6 flex items-center gap-3">
           <meta.icon className="w-7 h-7" /> {meta.title}
         </h1>
         {remoteErr ? (
@@ -424,7 +424,7 @@ export default function LibraryPage(props: Props) {
           >
             <div className="absolute inset-0 opacity-20 [background:radial-gradient(circle_at_top,white,transparent_60%)]" />
             <meta.icon className="w-9 h-9 mb-4" />
-            <h1 className="font-display font-black text-2xl leading-tight">{meta.title}</h1>
+            <h1 className="font-bold text-2xl leading-tight">{meta.title}</h1>
             <p className="text-sm text-white/80 mt-2">
               {list.length} {t("videosSavedOnDevice")}
             </p>
@@ -487,7 +487,7 @@ export default function LibraryPage(props: Props) {
   return (
     <div className="max-w-[1600px] mx-auto px-3 sm:px-6 pt-4 lg:pt-6">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <h1 className="font-display font-black text-2xl flex items-center gap-3">
+        <h1 className="font-bold text-2xl flex items-center gap-3">
           <meta.icon className="w-7 h-7" /> {meta.title}
         </h1>
         {list.length > 0 && (
@@ -496,7 +496,7 @@ export default function LibraryPage(props: Props) {
               props.onClearHistory();
               props.notify(t("historyClearedToast"));
             }}
-            className="h-9 px-4 rounded-full bg-yt-surface hover:bg-yt-hover text-sm font-medium flex items-center gap-2"
+            className="yt-pill flex items-center gap-2"
           >
             <Trash2 className="w-4 h-4" /> {t("clearHistory")}
           </button>

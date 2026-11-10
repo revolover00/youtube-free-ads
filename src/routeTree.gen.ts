@@ -10,18 +10,28 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AtChar123handleChar125RouteImport } from './routes/@{$handle}'
 import { Route as ChannelRouteImport } from './routes/channel'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as PlaylistRouteImport } from './routes/playlist'
 import { Route as PoliciesRouteImport } from './routes/policies'
+import { Route as ResultsRouteImport } from './routes/results'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as ShortsRouteImport } from './routes/shorts'
 import { Route as SubscriptionsRouteImport } from './routes/subscriptions'
 import { Route as WatchRouteImport } from './routes/watch'
+import { Route as ChannelIdRouteImport } from './routes/channel.$id'
+import { Route as FeedNameRouteImport } from './routes/feed.$name'
+import { Route as ShortsIdRouteImport } from './routes/shorts.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AtChar123handleChar125Route = AtChar123handleChar125RouteImport.update({
+  id: '/@{$handle}',
+  path: '/@{$handle}',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChannelRoute = ChannelRouteImport.update({
@@ -44,6 +54,11 @@ const PoliciesRoute = PoliciesRouteImport.update({
   path: '/policies',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResultsRoute = ResultsRouteImport.update({
+  id: '/results',
+  path: '/results',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
@@ -64,87 +79,135 @@ const WatchRoute = WatchRouteImport.update({
   path: '/watch',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChannelIdRoute = ChannelIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ChannelRoute,
+} as any)
+const FeedNameRoute = FeedNameRouteImport.update({
+  id: '/feed/$name',
+  path: '/feed/$name',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShortsIdRoute = ShortsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ShortsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/channel': typeof ChannelRoute
+  '/@{$handle}': typeof AtChar123handleChar125Route
+  '/channel': typeof ChannelRouteWithChildren
   '/library': typeof LibraryRoute
   '/playlist': typeof PlaylistRoute
   '/policies': typeof PoliciesRoute
+  '/results': typeof ResultsRoute
   '/search': typeof SearchRoute
-  '/shorts': typeof ShortsRoute
+  '/shorts': typeof ShortsRouteWithChildren
   '/subscriptions': typeof SubscriptionsRoute
   '/watch': typeof WatchRoute
+  '/channel/$id': typeof ChannelIdRoute
+  '/feed/$name': typeof FeedNameRoute
+  '/shorts/$id': typeof ShortsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/channel': typeof ChannelRoute
+  '/@{$handle}': typeof AtChar123handleChar125Route
+  '/channel': typeof ChannelRouteWithChildren
   '/library': typeof LibraryRoute
   '/playlist': typeof PlaylistRoute
   '/policies': typeof PoliciesRoute
+  '/results': typeof ResultsRoute
   '/search': typeof SearchRoute
-  '/shorts': typeof ShortsRoute
+  '/shorts': typeof ShortsRouteWithChildren
   '/subscriptions': typeof SubscriptionsRoute
   '/watch': typeof WatchRoute
+  '/channel/$id': typeof ChannelIdRoute
+  '/feed/$name': typeof FeedNameRoute
+  '/shorts/$id': typeof ShortsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/channel': typeof ChannelRoute
+  '/@{$handle}': typeof AtChar123handleChar125Route
+  '/channel': typeof ChannelRouteWithChildren
   '/library': typeof LibraryRoute
   '/playlist': typeof PlaylistRoute
   '/policies': typeof PoliciesRoute
+  '/results': typeof ResultsRoute
   '/search': typeof SearchRoute
-  '/shorts': typeof ShortsRoute
+  '/shorts': typeof ShortsRouteWithChildren
   '/subscriptions': typeof SubscriptionsRoute
   '/watch': typeof WatchRoute
+  '/channel/$id': typeof ChannelIdRoute
+  '/feed/$name': typeof FeedNameRoute
+  '/shorts/$id': typeof ShortsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/@{$handle}'
     | '/channel'
     | '/library'
     | '/playlist'
     | '/policies'
+    | '/results'
     | '/search'
     | '/shorts'
     | '/subscriptions'
     | '/watch'
+    | '/channel/$id'
+    | '/feed/$name'
+    | '/shorts/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/@{$handle}'
     | '/channel'
     | '/library'
     | '/playlist'
     | '/policies'
+    | '/results'
     | '/search'
     | '/shorts'
     | '/subscriptions'
     | '/watch'
+    | '/channel/$id'
+    | '/feed/$name'
+    | '/shorts/$id'
   id:
     | '__root__'
     | '/'
+    | '/@{$handle}'
     | '/channel'
     | '/library'
     | '/playlist'
     | '/policies'
+    | '/results'
     | '/search'
     | '/shorts'
     | '/subscriptions'
     | '/watch'
+    | '/channel/$id'
+    | '/feed/$name'
+    | '/shorts/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ChannelRoute: typeof ChannelRoute
+  AtChar123handleChar125Route: typeof AtChar123handleChar125Route
+  ChannelRoute: typeof ChannelRouteWithChildren
   LibraryRoute: typeof LibraryRoute
   PlaylistRoute: typeof PlaylistRoute
   PoliciesRoute: typeof PoliciesRoute
+  ResultsRoute: typeof ResultsRoute
   SearchRoute: typeof SearchRoute
-  ShortsRoute: typeof ShortsRoute
+  ShortsRoute: typeof ShortsRouteWithChildren
   SubscriptionsRoute: typeof SubscriptionsRoute
   WatchRoute: typeof WatchRoute
+  FeedNameRoute: typeof FeedNameRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -154,6 +217,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/@{$handle}': {
+      id: '/@{$handle}'
+      path: '/@{$handle}'
+      fullPath: '/@{$handle}'
+      preLoaderRoute: typeof AtChar123handleChar125RouteImport
       parentRoute: typeof rootRouteImport
     }
     '/channel': {
@@ -184,6 +254,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PoliciesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/results': {
+      id: '/results'
+      path: '/results'
+      fullPath: '/results'
+      preLoaderRoute: typeof ResultsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/search': {
       id: '/search'
       path: '/search'
@@ -212,19 +289,65 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WatchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/channel/$id': {
+      id: '/channel/$id'
+      path: '/$id'
+      fullPath: '/channel/$id'
+      preLoaderRoute: typeof ChannelIdRouteImport
+      parentRoute: typeof ChannelRoute
+    }
+    '/feed/$name': {
+      id: '/feed/$name'
+      path: '/feed/$name'
+      fullPath: '/feed/$name'
+      preLoaderRoute: typeof FeedNameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shorts/$id': {
+      id: '/shorts/$id'
+      path: '/$id'
+      fullPath: '/shorts/$id'
+      preLoaderRoute: typeof ShortsIdRouteImport
+      parentRoute: typeof ShortsRoute
+    }
   }
 }
 
+interface ChannelRouteChildren {
+  ChannelIdRoute: typeof ChannelIdRoute
+}
+
+const ChannelRouteChildren: ChannelRouteChildren = {
+  ChannelIdRoute: ChannelIdRoute,
+}
+
+const ChannelRouteWithChildren =
+  ChannelRoute._addFileChildren(ChannelRouteChildren)
+
+interface ShortsRouteChildren {
+  ShortsIdRoute: typeof ShortsIdRoute
+}
+
+const ShortsRouteChildren: ShortsRouteChildren = {
+  ShortsIdRoute: ShortsIdRoute,
+}
+
+const ShortsRouteWithChildren =
+  ShortsRoute._addFileChildren(ShortsRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ChannelRoute: ChannelRoute,
+  AtChar123handleChar125Route: AtChar123handleChar125Route,
+  ChannelRoute: ChannelRouteWithChildren,
   LibraryRoute: LibraryRoute,
   PlaylistRoute: PlaylistRoute,
   PoliciesRoute: PoliciesRoute,
+  ResultsRoute: ResultsRoute,
   SearchRoute: SearchRoute,
-  ShortsRoute: ShortsRoute,
+  ShortsRoute: ShortsRouteWithChildren,
   SubscriptionsRoute: SubscriptionsRoute,
   WatchRoute: WatchRoute,
+  FeedNameRoute: FeedNameRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

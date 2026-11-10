@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Check, Copy, Download, Loader2, Share2, Sparkles, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Camera,
+  Check,
+  Copy,
+  Download,
+  Loader2,
+  Share2,
+  Sparkles,
+  X,
+} from "lucide-react";
 import {
   canShareCapture,
   capture,
@@ -174,13 +184,24 @@ export default function ScreenshotDialog({
             )}
           </div>
 
+          {/*
+            When the storyboard fetch fails we fall back to the video poster.
+            That still produces an image, so without a clear notice it looks
+            like a successful capture of the wrong moment — worse than an error.
+          */}
+          {result?.source === "poster" && (
+            <div className="mt-2.5 flex items-start gap-2 rounded-lg bg-[#3a2e00] px-3 py-2 text-[13px] leading-[18px] text-[#ffd95c]">
+              <AlertTriangle className="mt-px h-4 w-4 shrink-0" />
+              <span>{t("screenshotSourcePoster")}</span>
+            </div>
+          )}
+
           <p className="mt-2.5 text-[13px] text-yt-sub">
             {result ? (
               <>
                 {fmtDuration(Math.round(result.at)) || "0:00"}
                 {" · "}
                 {result.nativeWidth}×{result.nativeHeight}
-                {result.source === "poster" && ` · ${t("screenshotSourcePoster")}`}
               </>
             ) : (
               t("screenshotHint")

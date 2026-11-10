@@ -20,6 +20,7 @@ import {
   Keyboard,
   Camera,
   Check,
+  ArrowUpDown,
 } from "lucide-react";
 import KeyboardShortcutsModal from "./KeyboardShortcutsModal";
 import ScreenshotDialog from "./ScreenshotDialog";
@@ -331,6 +332,11 @@ export default function Watch({
   const [moreOpen, setMoreOpen] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
+  // Comment sort ("Top comments" / "Newest first")
+  const [commentSort, setCommentSort] = useState<"top" | "newest">("top");
+  const [sortOpen, setSortOpen] = useState(false);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
+
   // Comments state & pagination
   const [commentsList, setCommentsList] = useState<PipedComment[]>([]);
   const [commentsCont, setCommentsCont] = useState<string | undefined>(undefined);
@@ -376,6 +382,17 @@ export default function Watch({
   });
 
   const chapters = useMemo(() => parseChapters(data?.description || ""), [data?.description]);
+
+  /*
+   * InnerTube hands comments back in YouTube's own "top" order, so that branch is
+   * the identity. "Newest first" reverses what we have paged in — YouTube refetches
+   * with a different continuation token, which we cannot do, so this orders the
+   * loaded set rather than the whole thread.
+   */
+  const sortedComments = useMemo(
+    () => (commentSort === "newest" ? [...commentsList].reverse() : commentsList),
+    [commentsList, commentSort],
+  );
 
   const activeChapterIndex = useMemo(() => {
     if (!chapters || chapters.length === 0) return -1;
@@ -577,6 +594,7 @@ export default function Watch({
     const onPointerDown = (e: PointerEvent) => {
       if (!moreMenuRef.current?.contains(e.target as Node)) setMoreOpen(false);
     };
+
     const onEsc = (e: KeyboardEvent) => {
       if (e.key === "Escape") setMoreOpen(false);
     };
@@ -587,6 +605,23 @@ export default function Watch({
       document.removeEventListener("keydown", onEsc);
     };
   }, [moreOpen]);
+
+  // Dismiss the comment-sort menu the same way
+  useEffect(() => {
+    if (!sortOpen) return undefined;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!sortMenuRef.current?.contains(e.target as Node)) setSortOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSortOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [sortOpen]);
 
   // Keyboard Shortcuts Handler (YouTube style)
   useEffect(() => {
@@ -1096,44 +1131,47 @@ export default function Watch({
         )}
 
         {/* Video Description & Metadata Box */}
+        {/*
+          YouTube's description is one #272727 surface at 12px radius. Collapsed
+          it shows the bold "views · date" line, three lines of text, and an
+          inline "...more"; the whole box is the hit target. Expanded it grows in
+          place and ends with "Show less". Hover only lightens when collapsed —
+          an expanded box is not clickable chrome.
+        */}
         <div
-          onClick={() => setExpanded((e) => !e)}
-          className="mt-4 p-3.5 sm:p-4 rounded-xl bg-yt-surface/80 hover:bg-yt-surface transition-colors cursor-pointer text-sm select-text"
+          onClick={() => {
+            if (!expanded) setExpanded(true);
+          }}
+          className={`mt-3 rounded-xl bg-yt-surface p-3 text-sm leading-5 text-yt-text ${
+            expanded ? "" : "cursor-pointer hover:bg-[#3f3f3f]"
+          }`}
         >
-          <div className="flex items-center gap-2 font-bold text-xs sm:text-sm text-yt-text flex-wrap">
+          <div className="flex flex-wrap items-center gap-x-2 font-medium text-yt-text">
             <span>
               {data.views ? fmtViews(data.views, lang) : "0"} {t("views")}
             </span>
-            <span>•</span>
             <span>{displayRelativeDate || cleanUploadDate}</span>
-            {data.category && (
-              <>
-                <span>•</span>
-                <span className="text-yt-sub font-medium">#{data.category}</span>
-              </>
-            )}
+            {data.category && <span className="text-yt-sub">#{data.category}</span>}
           </div>
 
           {data.description ? (
-            <div className="mt-2 text-yt-text leading-relaxed">
-              <p
-                className={`whitespace-pre-line ${expanded ? "" : "line-clamp-2 sm:line-clamp-3"}`}
-              >
+            <>
+              <div className={`mt-2 whitespace-pre-line ${expanded ? "" : "line-clamp-3"}`}>
                 <TextWithTimestamps text={data.description} />
-              </p>
+              </div>
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   setExpanded((x) => !x);
                 }}
-                className="mt-1 font-bold text-xs sm:text-sm text-yt-sub hover:text-yt-text block cursor-pointer"
+                className="mt-2 block font-medium text-yt-text hover:text-yt-text cursor-pointer"
               >
                 {expanded ? (isAr ? "إظهار أقل" : "Show less") : isAr ? "...المزيد" : "...more"}
               </button>
-            </div>
+            </>
           ) : (
-            <p className="mt-2 text-xs sm:text-sm text-yt-sub italic">{t("noDescription")}</p>
+            <p className="mt-2 text-yt-sub">{t("noDescription")}</p>
           )}
         </div>
 
@@ -1259,12 +1297,54 @@ export default function Watch({
 
         {/* Desktop Comments (Shows all comments with real count and pagination) */}
         <section className="hidden lg:block mt-6">
-          <div className="flex items-center gap-3">
-            <h2 className="font-display font-bold text-lg">
+          {/* YouTube: "N Comments" at 20px/700, then a text-only "Sort by" control. */}
+          <div className="flex items-center gap-8">
+            <h2 className="text-[20px] leading-[28px] font-bold text-yt-text">
               {totalCommentsCount > 0
-                ? `${formattedCommentsCount} ${isAr ? "تعليق" : "comments"}`
+                ? `${formattedCommentsCount} ${isAr ? "تعليق" : "Comments"}`
                 : t("comments")}
             </h2>
+            <div className="relative" ref={sortMenuRef}>
+              <button
+                type="button"
+                onClick={() => setSortOpen((o) => !o)}
+                className="flex items-center gap-1.5 py-2 text-sm font-medium text-yt-text cursor-pointer"
+                aria-haspopup="menu"
+                aria-expanded={sortOpen}
+              >
+                <ArrowUpDown className="w-5 h-5" />
+                <span>{isAr ? "الترتيب حسب" : "Sort by"}</span>
+              </button>
+              {sortOpen && (
+                <div
+                  role="menu"
+                  className="absolute start-0 top-10 z-50 min-w-[180px] rounded-xl bg-yt-raised py-2 shadow-[0_4px_32px_rgba(0,0,0,0.5)]"
+                >
+                  {(["top", "newest"] as const).map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setCommentSort(k);
+                        setSortOpen(false);
+                      }}
+                      className={`flex w-full items-center px-4 py-2.5 text-start text-sm hover:bg-yt-hover cursor-pointer ${
+                        commentSort === k ? "bg-yt-hover" : ""
+                      }`}
+                    >
+                      {k === "top"
+                        ? isAr
+                          ? "أهم التعليقات"
+                          : "Top comments"
+                        : isAr
+                          ? "الأحدث أولاً"
+                          : "Newest first"}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex gap-3 mt-4">
@@ -1285,7 +1365,7 @@ export default function Watch({
 
           <div className="mt-6 space-y-6">
             {!commentsList.length && <p className="text-sm text-yt-sub py-4">{t("noComments")}</p>}
-            {commentsList.map((c, i) => (
+            {sortedComments.map((c, i) => (
               <CommentRow key={i} c={c} />
             ))}
 

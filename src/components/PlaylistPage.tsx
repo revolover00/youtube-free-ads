@@ -125,7 +125,7 @@ export default function PlaylistPage(props: Props) {
           )}
           <div className="relative">
             <ListVideo className="w-9 h-9 mb-4" />
-            <h1 className="font-display font-black text-2xl leading-tight line-clamp-3">{title}</h1>
+            <h1 className="font-bold text-2xl leading-tight line-clamp-3">{title}</h1>
             <p className="text-sm text-white/80 mt-2">
               {uploader ? `${uploader} · ` : ""}
               {videoCount} {isAr ? "فيديو" : "videos"}

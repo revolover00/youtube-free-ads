@@ -7,6 +7,10 @@ const description = "شغّل الفيديو بجودة عالية مع الاق
 
 const searchSchema = z.object({
   v: fallback(z.string(), "").default(""),
+  /** Start offset, e.g. ?t=90 or ?t=1m30s. */
+  t: fallback(z.string(), "").optional(),
+  /** Playlist context, as YouTube appends when playing from a list. */
+  list: fallback(z.string(), "").optional(),
 });
 
 export const Route = createFileRoute("/watch")({

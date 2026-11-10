@@ -38,7 +38,7 @@ export default function PoliciesPage({ onBackToHome }: PoliciesPageProps) {
           <span className="hidden sm:inline">{isAr ? "الرئيسية" : "Home"}</span>
         </button>
         <span className="text-yt-sub">/</span>
-        <h1 className="text-xl md:text-2xl font-bold font-display text-white">
+        <h1 className="text-xl md:text-2xl font-bold text-white">
           {isAr ? "حقوق الاستخدام والسياسات" : "Terms of Service & Policies"}
         </h1>
       </div>

@@ -319,7 +319,7 @@ export default function Sidebar({
               <X className="w-5 h-5" />
             </button>
             <LogoIcon className="w-7 h-5" />
-            <span className="font-display font-extrabold text-lg">{t("brandName")}</span>
+            <span className="font-bold text-lg">{t("brandName")}</span>
           </div>
           <FullContent
             active={active}

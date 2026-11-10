@@ -1047,6 +1047,25 @@ export async function channel(input: string): Promise<ChannelData> {
     const subscriberCount = parseCount(subscriberText);
     const videoCount = parseCount(videoCountText);
 
+    /*
+     * The @handle. InnerTube exposes it as a canonical/vanity URL on the
+     * microformat or header; the metadata parts also carry it verbatim on the
+     * newer pageHeaderViewModel. Fall back to scanning the parts for a leading @.
+     */
+    const handleFromUrl = (u: unknown): string => {
+      const m = typeof u === "string" ? /\/(@[^/?#]+)/.exec(u) : null;
+      return m?.[1] ?? "";
+    };
+    const handle =
+      handleFromUrl(meta?.urlCanonical) ||
+      handleFromUrl(
+        header?.channelHandleText?.runs?.[0]?.navigationEndpoint?.commandMetadata
+          ?.webCommandMetadata?.url,
+      ) ||
+      text(header?.channelHandleText) ||
+      metaParts.map((pt: Json) => text(pt?.text)).find((v: string) => v.startsWith("@")) ||
+      "";
+
     // Extract channel videos and make sure uploader metadata is set
     const rawVideos = extractVideos(data);
     const homeVideos = extractVideos(homeData).filter((v) => !v.isShort);
@@ -1070,6 +1089,7 @@ export async function channel(input: string): Promise<ChannelData> {
     return {
       id: browseId,
       name,
+      handle: handle || undefined,
       avatarUrl: avatar,
       bannerUrl: banner,
       subscriberCount: subscriberCount || undefined,

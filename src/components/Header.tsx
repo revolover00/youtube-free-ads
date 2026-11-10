@@ -219,9 +219,7 @@ export default function Header({
             aria-label="YouTube"
           >
             <LogoIcon className="w-7 h-5" />
-            <span className="font-display font-extrabold text-lg tracking-tight leading-none">
-              {t("brandName")}
-            </span>
+            <span className="font-bold text-lg tracking-tight leading-none">{t("brandName")}</span>
             <sup className="text-[9px] text-yt-sub font-sans font-medium -mt-2 hidden sm:inline">
               {t("countryCode")}
             </sup>
@@ -363,7 +361,7 @@ export default function Header({
                 <div className="fixed inset-0 z-40" onClick={() => setPopover(null)} />
                 <div className="dropdown-in absolute end-0 top-12 z-50 w-[340px] max-w-[90vw] rounded-xl bg-yt-raised border border-yt-border shadow-2xl shadow-black/60 overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-yt-border">
-                    <span className="font-display font-bold text-[15px]">{t("notifications")}</span>
+                    <span className="font-bold text-[15px]">{t("notifications")}</span>
                     <button
                       className="w-8 h-8 rounded-full hover:bg-yt-surface grid place-items-center"
                       aria-label="More"
@@ -714,7 +712,7 @@ export default function Header({
               <Mic className="w-9 h-9 text-white" />
             </span>
           </span>
-          <p className="font-display font-bold text-lg">{t("listening")}</p>
+          <p className="font-bold text-lg">{t("listening")}</p>
           <p className="text-yt-sub text-sm">{t("speakNow")}</p>
           <button
             onClick={() => setListening(false)}

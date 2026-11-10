@@ -633,7 +633,7 @@ export function ShortsShelf({
     <section id="shorts-shelf" className="rise my-8 py-4 border-y border-yt-border">
       <div className="flex items-center gap-2.5 mb-4 px-0.5">
         <ShortsIcon className="w-7 h-7 text-yt-red" />
-        <h2 className="font-display font-extrabold text-xl">{t("shorts")}</h2>
+        <h2 className="font-bold text-xl">{t("shorts")}</h2>
       </div>
       <div className="flex gap-3 overflow-x-auto no-scrollbar snap-x pb-1">
         {items.map((s, i) => (
@@ -694,7 +694,7 @@ export function ErrorState({ message, onRetry }: { message?: string; onRetry: ()
       <div className="w-20 h-20 rounded-full bg-yt-surface grid place-items-center mb-5">
         <AlertTriangle className="w-9 h-9 text-red-400" />
       </div>
-      <h3 className="font-display font-bold text-lg">{t("loadError")}</h3>
+      <h3 className="font-bold text-lg">{t("loadError")}</h3>
       <p className="text-yt-sub text-sm mt-1 max-w-sm">{message || t("loadError")}</p>
       <button
         onClick={onRetry}
@@ -722,7 +722,7 @@ export function EmptyState({ message }: { message?: string }) {
           <path d="m20 20-3.5-3.5" strokeLinecap="round" />
         </svg>
       </div>
-      <h3 className="font-display font-bold text-lg">{t("noResults")}</h3>
+      <h3 className="font-bold text-lg">{t("noResults")}</h3>
       <p className="text-yt-sub text-sm mt-1 max-w-xs">{message || t("noResultsSuggestion")}</p>
     </div>
   );

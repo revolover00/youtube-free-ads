@@ -63,7 +63,7 @@ export default function ShortsViewer({ items, startIndex, onClose, notify, onOpe
       <div className="h-14 shrink-0 flex items-center justify-between px-3 text-white">
         <div className="flex items-center gap-2">
           <ShortsIcon className="w-7 h-7 text-yt-red" />
-          <span className="font-display font-extrabold text-lg">{t("shorts")}</span>
+          <span className="font-bold text-lg">{t("shorts")}</span>
         </div>
         <div className="flex items-center gap-1">
           <button

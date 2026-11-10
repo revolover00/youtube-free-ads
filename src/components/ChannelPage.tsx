@@ -155,9 +155,12 @@ export default function ChannelPage({
     onAddToPlaylist,
   });
 
+  // Prefer the handle InnerTube reported; fall back to a /@handle style route param.
+  const handle = data.handle || (channelId.startsWith("@") ? channelId : "");
+
   return (
     <div className="max-w-[1280px] mx-auto pb-10">
-      <div className="h-24 sm:h-40 lg:h-52 mx-3 sm:mx-6 mt-3 rounded-2xl relative overflow-hidden bg-gradient-to-l from-yt-red/40 via-yt-raised to-yt-surface">
+      <div className="h-24 sm:h-40 lg:h-52 mx-3 sm:mx-6 mt-3 rounded-xl relative overflow-hidden bg-yt-surface">
         {data.bannerUrl ? (
           <img
             src={data.bannerUrl}
@@ -170,18 +173,24 @@ export default function ChannelPage({
         )}
       </div>
 
-      <div className="px-4 sm:px-8 mt-4 flex flex-col sm:flex-row items-center sm:items-end gap-4 sm:gap-6">
+      {/*
+        YouTube's channel header is left-aligned at every breakpoint — it never
+        centres on mobile. Name at 36px/700, then a single metadata line
+        "@handle · N subscribers · N videos", then a one-line description.
+      */}
+      <div className="px-4 sm:px-8 mt-4 flex flex-col sm:flex-row items-start sm:items-end gap-4 sm:gap-6">
         <Avatar
           src={data.avatarUrl}
           name={data.name}
           size="w-20 h-20 sm:w-32 sm:h-32 text-4xl sm:text-6xl"
         />
-        <div className="flex-1 text-center sm:text-start">
-          <h1 className="font-display font-black text-2xl sm:text-3xl flex items-center gap-2 justify-center sm:justify-start">
+        <div className="flex-1 min-w-0 text-start">
+          <h1 className="flex items-center gap-2 text-[24px] leading-[32px] sm:text-[36px] sm:leading-[44px] font-bold text-yt-text">
             {data.name}
-            {data.verified && <BadgeCheck className="w-5 h-5 text-yt-sub" />}
+            {data.verified && <BadgeCheck className="w-5 h-5 shrink-0 text-yt-sub" />}
           </h1>
-          <div className="text-sm text-yt-sub mt-1 flex flex-wrap items-center gap-x-2 justify-center sm:justify-start">
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 text-sm leading-5 text-yt-sub">
+            {handle && <span className="font-medium text-yt-text">{handle}</span>}
             {data.subscriberText ? (
               <span>{data.subscriberText}</span>
             ) : data.subscriberCount != null ? (
@@ -202,16 +211,14 @@ export default function ChannelPage({
               </span>
             )}
           </div>
-          <p className="text-sm text-yt-sub mt-2 max-w-xl line-clamp-1 mx-auto sm:mx-0">
+          <p className="mt-1 max-w-xl line-clamp-1 text-sm leading-5 text-yt-sub">
             {data.description}
           </p>
-          <div className="flex items-center gap-2 mt-4 justify-center sm:justify-start">
+          <div className="flex items-center gap-2 mt-4">
             <button
               onClick={() => onToggleSub({ channelId, name: data.name, avatar: data.avatarUrl })}
-              className={`h-9 px-4 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${
-                isSubscribed
-                  ? "bg-yt-surface text-yt-text"
-                  : "bg-yt-text text-yt-bg hover:bg-white/80"
+              className={`yt-pill cursor-pointer ${
+                isSubscribed ? "" : "!bg-yt-text !text-yt-bg hover:!bg-white"
               }`}
             >
               {isSubscribed && <Bell className="w-4 h-4" />}
@@ -219,7 +226,7 @@ export default function ChannelPage({
             </button>
             <button
               onClick={() => notify(t("channelLinkCopied"))}
-              className="h-9 px-4 rounded-full bg-yt-surface hover:bg-yt-hover text-sm font-medium flex items-center gap-2"
+              className="yt-pill cursor-pointer"
             >
               <Share2 className="w-4 h-4" /> {t("share")}
             </button>
@@ -233,7 +240,7 @@ export default function ChannelPage({
             <button
               key={tItem.id}
               onClick={() => setTabId(tItem.id)}
-              className={`shrink-0 px-4 py-3 text-sm font-bold border-b-2 -mb-px transition-colors ${
+              className={`shrink-0 h-12 px-4 text-sm font-medium border-b-2 -mb-px cursor-pointer ${
                 tabId === tItem.id
                   ? "border-yt-text text-yt-text"
                   : "border-transparent text-yt-sub hover:text-yt-text"
@@ -268,7 +275,7 @@ export default function ChannelPage({
                 </button>
                 <div className="md:pt-2">
                   <span className="text-xs text-yt-sub">{t("featuredVideo")}</span>
-                  <h2 className="font-display font-bold text-lg sm:text-xl mt-1 leading-snug">
+                  <h2 className="font-bold text-lg sm:text-xl mt-1 leading-snug">
                     {featured.title}
                   </h2>
                   <p className="text-sm text-yt-sub mt-2">
@@ -285,7 +292,7 @@ export default function ChannelPage({
               <div className="pt-4 border-t border-yt-border">
                 <div className="flex items-center gap-2 mb-4">
                   <ShortsIcon className="w-5 h-5 text-yt-red" />
-                  <h3 className="font-display font-bold text-lg">{t("shorts")}</h3>
+                  <h3 className="font-bold text-lg">{t("shorts")}</h3>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
                   {shorts.slice(0, 6).map((s, i) => (
@@ -363,12 +370,12 @@ export default function ChannelPage({
 
         {tabId === "about" && (
           <div className="max-w-2xl rise">
-            <h3 className="font-display font-bold text-lg mb-3">{t("description")}</h3>
+            <h3 className="font-bold text-lg mb-3">{t("description")}</h3>
             <p className="text-sm leading-relaxed text-yt-text/90 whitespace-pre-line">
               {data.description || t("noDescription")}
             </p>
             <hr className="border-yt-border my-6" />
-            <h3 className="font-display font-bold text-lg mb-3">{t("details")}</h3>
+            <h3 className="font-bold text-lg mb-3">{t("details")}</h3>
             <ul className="space-y-2.5 text-sm text-yt-sub">
               {data.subscriberText ? (
                 <li>👥 {data.subscriberText}</li>

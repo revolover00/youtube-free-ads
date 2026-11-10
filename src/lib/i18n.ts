@@ -246,7 +246,8 @@ export const TRANSLATIONS = {
     screenshotFailed: "Could not capture this frame",
     screenshotWorking: "Capturing frame…",
     screenshotHdHint: "Pick this tab in the prompt for a full-resolution grab",
-    screenshotSourcePoster: "Exact frame unavailable — showing the video poster",
+    screenshotSourcePoster:
+      "Could not fetch the exact frame, so this is the video's poster image, not your timestamp.",
   },
   ar: {
     // Brand
@@ -489,7 +490,8 @@ export const TRANSLATIONS = {
     screenshotFailed: "تعذّر التقاط هذه اللحظة",
     screenshotWorking: "جارٍ التقاط اللقطة…",
     screenshotHdHint: "اختر هذه الصفحة من نافذة الإذن للحصول على دقة كاملة",
-    screenshotSourcePoster: "تعذّر جلب اللحظة بدقة — هذه صورة الفيديو",
+    screenshotSourcePoster:
+      "تعذّر جلب اللحظة المحددة، فدي صورة غلاف الفيديو مش اللحظة اللي أنت واقف عندها.",
   },
 };
 
