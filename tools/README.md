@@ -122,6 +122,47 @@ are both reachable from Supabase's egress but **not** from this sandbox, so
 production checks go through `supabase.execute_query` + `public.http()` rather
 than curl.
 
+## How the storyboard was finally unlocked
+
+For several rounds the conclusion was that a server simply cannot obtain a
+storyboard spec, because `youtubei/v1/player` answers `LOGIN_REQUIRED` from a
+cloud IP no matter how the request is shaped. That part is still true — a
+warmed session carrying cookies *and* a live `visitorData` is **0/6** on the
+player endpoint, because it wants BotGuard attestation.
+
+The watch page is different, and the gate turns out to be **per session, not
+per video**:
+
+| what was tried | result |
+| --- | --- |
+| watch page, no cookies | 0/3 — player response stripped |
+| watch page, one jar reused for 8 attempts | **0/8** |
+| watch page, a *fresh* jar per attempt | hits on try 2, 3, 4, 5 — roughly 1 in 3 |
+| `youtubei/v1/player`, warmed jar + `visitorData` | 0/6, all `LOGIN_REQUIRED` |
+
+So the trick is simply to throw the session away and mint a new one between
+attempts. A miss returns `playabilityStatus: LOGIN_REQUIRED` with the whole
+player response removed; a hit returns the real thing, and the signed sheet
+URL built from its spec then fetches cleanly (`HTTP 200`, `image/webp`).
+
+`freshSessionJar()` mints those sessions from `sw.js_data` — 2.8 KB for the
+same six cookies (`VISITOR_INFO1_LIVE`, `__Secure-YNID`, `YSC`, …) that the
+869 KB home page sets. Attempts are raced three at a time, so a nine-attempt
+budget costs about the latency of three.
+
+Two cache rules keep it honest:
+
+- a spec-less result is a *miss*, not an answer, so it is never cached for the
+  full six hours — otherwise one unlucky moment freezes the cover image in
+  place for the rest of the day;
+- `videoDetails()` asks for a single attempt (it only wants a duration) while
+  `videoFrame()` asks for nine, because there the alternative is handing the
+  user the wrong picture.
+
+Measured against production after the change: **10 of 10 distinct videos
+returned `source: "storyboard"`, in 1.7–2.4 s**, where every one of them had
+returned the poster before.
+
 ## How the storyboard source was diagnosed
 
 `youtubei/v1/player` was called directly from a cloud host (Postgres `http`
