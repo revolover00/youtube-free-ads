@@ -36,6 +36,39 @@ interface Props {
 }
 
 /**
+ * Whether to reach for the screen-capture path first.
+ *
+ * YouTube answers `youtubei/v1/player` with a bot check ("LOGIN_REQUIRED") for
+ * most videos when the caller is a datacentre IP, which is every request our
+ * server makes. Measured against the live deployment, four of four real feed
+ * videos came back with no storyboard at all — so the server path silently
+ * degrades to the poster and the user gets the thumbnail instead of the frame
+ * they were looking at. `getDisplayMedia` reads the already-decoded frame off
+ * the compositor, so it cannot be rate-limited or bot-gated, and it is the
+ * only path that returns the actual moment on screen.
+ *
+ * Remembered per browser: dismissing the share prompt turns it off so nobody
+ * is nagged twice, and picking "HD" explicitly turns it back on.
+ */
+const HD_FIRST_KEY = "yt:screenshot-hd-first";
+
+function prefersHdFirst(): boolean {
+  try {
+    return localStorage.getItem(HD_FIRST_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+function setPrefersHdFirst(on: boolean): void {
+  try {
+    localStorage.setItem(HD_FIRST_KEY, on ? "1" : "0");
+  } catch {
+    /* private mode — fall back to the in-memory default */
+  }
+}
+
+/**
  * Preview + export surface for an in-page frame grab.
  *
  * Deliberately built out of the same tokens as the rest of the app
@@ -64,23 +97,33 @@ export default function ScreenshotDialog({
     async (nextTier: CaptureTier, nextCard: boolean) => {
       setBusy(true);
       setFailed(null);
+      const opts = {
+        videoId,
+        time,
+        title,
+        channel,
+        captionCard: nextCard,
+        // The player is rendered once at the app root and moved around, so
+        // this is the element the HD path crops a tab capture down to.
+        cropSelector: "#persistent-player",
+      };
       try {
-        const r = await capture(nextTier, {
-          videoId,
-          time,
-          title,
-          channel,
-          captionCard: nextCard,
-          // The player is rendered once at the app root and moved around, so
-          // this is the element the HD path crops a tab capture down to.
-          cropSelector: "#persistent-player",
-        });
-        setResult(r);
+        setResult(await capture(nextTier, opts));
       } catch (e) {
-        // A declined share prompt is a user choice, not a failure to report.
-        const aborted = e instanceof DOMException && e.name === "NotAllowedError";
-        if (!aborted) setFailed(e instanceof Error ? e.message : String(e));
-        if (nextTier === "hd") setTier("quick");
+        const declined = e instanceof DOMException && e.name === "NotAllowedError";
+        if (nextTier === "hd") {
+          // Dismissing the share prompt must not leave an empty dialog — drop
+          // to the server frame, and stop opening the prompt automatically.
+          if (declined) setPrefersHdFirst(false);
+          setTier("quick");
+          try {
+            setResult(await capture("quick", opts));
+          } catch (inner) {
+            setFailed(inner instanceof Error ? inner.message : String(inner));
+          }
+        } else if (!declined) {
+          setFailed(e instanceof Error ? e.message : String(e));
+        }
       } finally {
         setBusy(false);
       }
@@ -89,13 +132,16 @@ export default function ScreenshotDialog({
   );
 
   // Capture once per opening; re-run only when a knob actually changes.
+  // Opening the dialog came from a click, so the screen-capture prompt still
+  // has transient activation here.
   useEffect(() => {
     if (!open) return;
     setResult(null);
     setCopied(false);
-    setTier("quick");
     setCaptionCard(false);
-    void run("quick", false);
+    const startTier: CaptureTier = isHdCaptureSupported() && prefersHdFirst() ? "hd" : "quick";
+    setTier(startTier);
+    void run(startTier, false);
   }, [open, run]);
 
   useEffect(() => {
@@ -118,6 +164,8 @@ export default function ScreenshotDialog({
 
   const onPickTier = (next: CaptureTier) => {
     if (next === tier || busy) return;
+    // An explicit pick is also a standing preference for the next capture.
+    setPrefersHdFirst(next === "hd");
     setTier(next);
     void run(next, captionCard);
   };
@@ -195,12 +243,25 @@ export default function ScreenshotDialog({
           {result?.source === "poster" && (
             <div className="mt-2.5 flex items-start gap-2 rounded-lg bg-[#3a2e00] px-3 py-2 text-[13px] leading-[18px] text-[#ffd95c]">
               <AlertTriangle className="mt-px h-4 w-4 shrink-0" />
-              <span>
+              <span className="min-w-0">
                 {t("screenshotSourcePoster")}
                 {/* The server reports why it had to substitute the poster;
                     without it a failure is indistinguishable from "this video
                     just has no storyboard". */}
                 {result.note && <span className="block opacity-70">{result.note}</span>}
+                {/* The poster is never what was asked for, so offer the one
+                    path that cannot be refused by YouTube. */}
+                {hdAvailable && (
+                  <button
+                    type="button"
+                    onClick={() => onPickTier("hd")}
+                    disabled={busy}
+                    className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-full bg-[#ffd95c] px-3 text-[13px] font-medium text-[#3a2e00] hover:bg-[#ffe484] disabled:opacity-50"
+                  >
+                    <Camera className="h-4 w-4" />
+                    {isAr ? "التقط الإطار الحقيقي" : "Capture the real frame"}
+                  </button>
+                )}
               </span>
             </div>
           )}

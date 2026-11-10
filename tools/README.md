@@ -150,3 +150,47 @@ Three different timestamps return three different sheets, each byte-for-byte
 the size measured independently against `i.ytimg.com`, with the offsets
 `tools/live-storyboard-test.mjs` predicts — and `source` is `storyboard`, not
 `poster`.
+
+## `hd-capture-test.mjs`
+
+```bash
+YT_UI_FIXTURE=1 npm run dev          # terminal 1
+LD_LIBRARY_PATH=/tmp/allibs/lib node tools/hd-capture-test.mjs
+```
+
+`getDisplayMedia` can't be driven headlessly, but `captureHd` only ever
+consumes a `MediaStream` — so the test swaps in a canvas `captureStream()`
+painted green everywhere except the rectangle where `#persistent-player` sits,
+which is pink. A correct capture is therefore pink in the middle. That runs the
+real code: video element, decode wait, `videoWidth`, the
+`displaySurface === "browser"` crop, and `compose`. 6 assertions.
+
+It also covers the dismissal path: `getDisplayMedia` rejecting with
+`NotAllowedError` must fall back to the server frame rather than leave a
+spinner, and must not re-open the prompt on the next capture.
+
+## Why HD is the default capture
+
+Measured against the live deployment, asking the server for the storyboard of
+four real feed videos returned **`source: "poster"` four times out of four** —
+YouTube answers `youtubei/v1/player` with `playabilityStatus: LOGIN_REQUIRED`
+("sign in to confirm you're not a bot") for datacentre IPs. Every request shape
+tried from a cloud host was gated:
+
+| client | result |
+| --- | --- |
+| `WEB` + API key + `origin`/`referer` | `LOGIN_REQUIRED` |
+| `ANDROID_VR` 1.60.19 | `LOGIN_REQUIRED` |
+| `TVHTML5` 7.20240304.10.00 | `LOGIN_REQUIRED` |
+| `WEB_EMBEDDED_PLAYER` + `thirdParty.embedUrl` | `ERROR` |
+| `GET /watch?v=…` with a browser UA | `LOGIN_REQUIRED` |
+
+So the server path cannot be relied on, no matter how the request is shaped —
+it degrades to the poster, which looks like a successful capture of the wrong
+moment. `getDisplayMedia` reads the frame off the compositor, needs nothing
+from YouTube, and cannot be rate-limited, so the dialog now reaches for it
+first wherever it exists and keeps the storyboard as the fallback.
+
+Unsigned frames that are *not* gated, if a better no-prompt fallback is ever
+wanted: `https://i.ytimg.com/vi/<id>/hq1.jpg`, `hq2.jpg`, `hq3.jpg` — real
+frames at roughly 25 %, 50 % and 75 % of the video (verified `200 image/jpeg`).
