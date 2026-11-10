@@ -1437,41 +1437,63 @@ async function freshSessionJar(): Promise<string> {
  * Each attempt costs ~1.3 MB, hence the explicit budget: callers that merely
  * want a duration ask for one, the screenshot path asks for several.
  */
+/** One independent roll of the dice: a new session, one watch-page read. */
+async function watchPageAttempt(
+  videoId: string,
+): Promise<{ duration: number; storyboardSpec: string; status: number }> {
+  const cookie = await freshSessionJar();
+  try {
+    const res = await fetch(
+      `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}&hl=en`,
+      {
+        headers: {
+          "user-agent": BROWSER_UA,
+          "accept-language": "en-US,en;q=0.9",
+          accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          referer: "https://www.youtube.com/",
+          cookie,
+        },
+      },
+    );
+    if (!res.ok) return { duration: 0, storyboardSpec: "", status: res.status };
+    const html = await res.text();
+    const spec =
+      /"playerStoryboardSpecRenderer":\{"spec":"((?:[^"\\]|\\.)*)"/.exec(html)?.[1] ?? "";
+    return {
+      duration: Number(/"lengthSeconds":"(\d+)"/.exec(html)?.[1] ?? "") || 0,
+      storyboardSpec: spec ? jsonStringValue(spec) : "",
+      status: res.status,
+    };
+  } catch {
+    return { duration: 0, storyboardSpec: "", status: 0 };
+  }
+}
+
+/** How many sessions to race at once. More than this is impolite to both ends. */
+const WATCH_PAGE_CONCURRENCY = 3;
+
 async function watchPageMeta(
   videoId: string,
   attempts = 1,
 ): Promise<{ duration: number; storyboardSpec: string }> {
   let duration = 0;
   let lastStatus = 0;
+  const budget = Math.max(1, attempts);
 
-  for (let i = 0; i < Math.max(1, attempts); i++) {
-    const cookie = await freshSessionJar();
-    let html = "";
-    try {
-      const res = await fetch(
-        `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}&hl=en`,
-        {
-          headers: {
-            "user-agent": BROWSER_UA,
-            "accept-language": "en-US,en;q=0.9",
-            accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            referer: "https://www.youtube.com/",
-            cookie,
-          },
-        },
-      );
-      lastStatus = res.status;
-      if (!res.ok) continue;
-      html = await res.text();
-    } catch {
-      continue;
+  // The sessions are independent, so attempts are raced in small batches
+  // instead of queued. The budget says how many rolls of the dice we are
+  // willing to buy, not how long the user should be made to wait for them.
+  for (let done = 0; done < budget; done += WATCH_PAGE_CONCURRENCY) {
+    const size = Math.min(WATCH_PAGE_CONCURRENCY, budget - done);
+    const batch = await Promise.all(Array.from({ length: size }, () => watchPageAttempt(videoId)));
+
+    for (const r of batch) {
+      if (!duration && r.duration) duration = r.duration;
+      if (r.status) lastStatus = r.status;
     }
 
-    if (!duration) duration = Number(/"lengthSeconds":"(\d+)"/.exec(html)?.[1] ?? "") || 0;
-
-    const spec =
-      /"playerStoryboardSpecRenderer":\{"spec":"((?:[^"\\]|\\.)*)"/.exec(html)?.[1] ?? "";
-    if (spec) return { duration, storyboardSpec: jsonStringValue(spec) };
+    const won = batch.find((r) => r.storyboardSpec);
+    if (won) return { duration: duration || won.duration, storyboardSpec: won.storyboardSpec };
   }
 
   if (!duration && lastStatus && lastStatus !== 200) {
@@ -1615,7 +1637,7 @@ export async function videoFrame(videoId: string, time: number): Promise<FrameRe
   try {
     // Worth several swings: this is an explicit "give me this exact frame"
     // request, and the alternative is handing back the cover image.
-    const { duration, storyboardSpec } = await playerMeta(videoId, 6);
+    const { duration, storyboardSpec } = await playerMeta(videoId, 9);
     const levels = parseStoryboardSpec(storyboardSpec);
 
     if (!levels.length) {
