@@ -110,3 +110,43 @@ and the same video, the watch page returned `LOGIN_REQUIRED` while the keyed API
 call returned `OK` with the spec — which is why the keyed call is tried first.
 `i.ytimg.com` itself is never gated, so once a spec is in hand the sheets always
 fetch.
+
+## Verifying the deployed `videoFrameFn` end to end
+
+The production server function can be invoked directly, which proves the whole
+chain (deployed server → YouTube → storyboard sheet → base64 → client payload)
+without a browser:
+
+```
+POST https://youtubiy.vercel.app/_serverFn/<serverFnMeta.id>
+Sec-Fetch-Site: same-origin          ← CSRF middleware checks this first
+Content-Type: application/json
+<seroval-encoded { data, context }>
+```
+
+Two details make or break the call:
+
+- The id is **not** the function name. Grep the built server bundle for
+  `videoFrameFn_createServerFn_handler = createServerRpc` and read the `id`
+  field next to it.
+- The body is **seroval**, not plain JSON, and it decodes to `{ data, context }`
+  — not to an array of arguments. Generate it with the project's own copy:
+
+  ```bash
+  node -e "console.log(JSON.stringify(require('seroval').toJSON(
+    { data: { id: 'dQw4w9WgXcQ', time: 100 }, context: {} })))"
+  ```
+
+Results against the live deployment for `dQw4w9WgXcQ` (213 s), decoding the
+returned `sheet` back to bytes:
+
+| requested `time` | returned `x`,`y` | sheet bytes | sheet the CDN serves | `source` |
+| --- | --- | --- | --- | --- |
+| 0 | 0, 0 | 21 228 | `L3/M0` 21 228 B | `storyboard` |
+| 100 | 640, 180 | 28 138 | `L3/M5` 28 138 B | `storyboard` |
+| 212 | 320, 360 | 13 536 | `L3/M11` 13 536 B | `storyboard` |
+
+Three different timestamps return three different sheets, each byte-for-byte
+the size measured independently against `i.ytimg.com`, with the offsets
+`tools/live-storyboard-test.mjs` predicts — and `source` is `storyboard`, not
+`poster`.
