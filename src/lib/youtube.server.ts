@@ -8,6 +8,7 @@
 
 import { addressFrame, parseStoryboardSpec } from "./storyboard";
 import { USE_FIXTURE, fixtureVideoDetails, fixtureVideoFrame, fixtureVideos } from "./fixtures";
+import { extractJsonVar } from "./htmljson";
 import type {
   ChannelData,
   PipedComment,
@@ -26,6 +27,21 @@ const CLIENT = {
   hl: "ar",
   gl: "EG",
 };
+
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+/** Public InnerTube key the youtube.com web player itself uses. */
+const INNERTUBE_WEB_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
+
+/** Decode a raw JSON string body (handles \u0026, \/, \" …) without parsing the whole blob. */
+function jsonStringValue(raw: string): string {
+  try {
+    return JSON.parse(`"${raw}"`) as string;
+  } catch {
+    return raw;
+  }
+}
 
 const cache = new Map<string, { at: number; data: unknown; inflight?: Promise<unknown> }>();
 
@@ -94,22 +110,140 @@ async function cached<T>(key: string, ttlMs: number, fn: () => Promise<T>): Prom
   }
 }
 
+/**
+ * Consent cookie that skips the EU interstitial. Datacentre egress (Vercel's
+ * serverless IPs) is routinely treated as "unknown region", so sending it
+ * unconditionally keeps responses in JSON instead of a consent redirect.
+ */
+const CONSENT_COOKIE = "SOCS=CAISEwgDEgk0ODE3Nzk3MjQaAmVuIAEaBgiA_LyaBg";
+
+/**
+ * A visitor session id.
+ *
+ * YouTube hands anonymous callers a `visitorData` token and increasingly
+ * *requires* it on `next`/`browse` when the request comes from a cloud IP —
+ * without one those endpoints answer 403 even though `search` still works.
+ * Scraped from the home page's `ytcfg`, cached, and refreshed on demand.
+ */
+let visitorSession: { at: number; value: string } | null = null;
+
+async function visitorId(force = false): Promise<string> {
+  const now = Date.now();
+  if (!force && visitorSession && now - visitorSession.at < 30 * 60 * 1000) {
+    return visitorSession.value;
+  }
+  try {
+    const res = await fetch("https://www.youtube.com/?hl=en", {
+      headers: {
+        "user-agent": BROWSER_UA,
+        "accept-language": "en-US,en;q=0.9",
+        accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        cookie: CONSENT_COOKIE,
+      },
+    });
+    if (res.ok) {
+      const raw = /"visitorData":"([^"]+)"/.exec(await res.text())?.[1] ?? "";
+      if (raw) {
+        visitorSession = { at: now, value: jsonStringValue(raw) };
+        return visitorSession.value;
+      }
+    }
+  } catch {
+    /* fall through to whatever we already had */
+  }
+  return visitorSession?.value ?? "";
+}
+
 export async function innertube<T = Json>(
   endpoint: "search" | "browse" | "next" | "player",
   body: Record<string, unknown>,
 ): Promise<T> {
-  const res = await fetch(`${INNERTUBE}/${endpoint}?prettyPrint=false`, {
-    method: "POST",
-    headers: {
+  const plain = () =>
+    fetch(`${INNERTUBE}/${endpoint}?prettyPrint=false`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "accept-language": "ar,en;q=0.8",
+        "user-agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      },
+      body: JSON.stringify({ context: { client: CLIENT }, ...body }),
+    });
+
+  /** Same call, but as a fully attributed web-player session. */
+  const withSession = async () => {
+    const visitor = await visitorId(true);
+    const headers: Record<string, string> = {
       "content-type": "application/json",
       "accept-language": "ar,en;q=0.8",
-      "user-agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-    },
-    body: JSON.stringify({ context: { client: CLIENT }, ...body }),
-  });
+      "user-agent": BROWSER_UA,
+      origin: "https://www.youtube.com",
+      referer: "https://www.youtube.com/",
+      "x-youtube-client-name": "1",
+      "x-youtube-client-version": CLIENT.clientVersion,
+      cookie: CONSENT_COOKIE,
+    };
+    if (visitor) headers["x-goog-visitor-id"] = visitor;
+    return fetch(`${INNERTUBE}/${endpoint}?key=${INNERTUBE_WEB_KEY}&prettyPrint=false`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        context: { client: visitor ? { ...CLIENT, visitorData: visitor } : CLIENT },
+        ...body,
+      }),
+    });
+  };
+
+  // The bare request is what has always worked from most IPs, so it stays the
+  // fast path; the session upgrade is only paid for when YouTube pushes back.
+  let res = await plain();
+  if (res.status === 401 || res.status === 403) res = await withSession();
   if (!res.ok) throw new Error(`youtube ${endpoint} → HTTP ${res.status}`);
   return (await res.json()) as T;
+}
+
+/**
+ * The watch page's `ytInitialData` — byte-for-byte the same renderer tree that
+ * `youtubei/v1/next` returns, so every parser below works on it unchanged.
+ */
+async function watchPageNextData(videoId: string): Promise<Json | null> {
+  try {
+    const res = await fetch(
+      `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}&hl=ar&gl=EG`,
+      {
+        headers: {
+          "user-agent": BROWSER_UA,
+          "accept-language": "ar,en;q=0.8",
+          accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          cookie: CONSENT_COOKIE,
+        },
+      },
+    );
+    if (!res.ok) return null;
+    return extractJsonVar(await res.text(), "ytInitialData");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * `next` for a watch page, with the HTML scrape as a backstop.
+ *
+ * YouTube 403s `youtubei/v1/next` from some datacentre ranges while happily
+ * serving the very same data inside the watch page, which is why a failure
+ * here must not be the end of the road. The thrown message carries the status
+ * of every attempt so production failures stay diagnosable.
+ */
+async function nextPayload(videoId: string): Promise<Json> {
+  let apiNote = "";
+  try {
+    return await innertube("next", { videoId });
+  } catch (err) {
+    apiNote = err instanceof Error ? err.message.replace("youtube next → ", "") : "failed";
+  }
+  const scraped = await watchPageNextData(videoId);
+  if (scraped) return scraped;
+  throw new Error(`video unavailable (api ${apiNote}, watch page unreadable)`);
 }
 
 /* ------------------------------------------------------------------ */
@@ -775,7 +909,7 @@ export async function videoDetails(videoId: string): Promise<StreamData> {
   if (USE_FIXTURE) return fixtureVideoDetails();
   const key = `videoDetails:${videoId}`;
   return cached(key, 60 * 60 * 1000, async () => {
-    const next = await innertube("next", { videoId });
+    const next = await nextPayload(videoId);
 
     const primary = collect(next, "videoPrimaryInfoRenderer")[0] ?? {};
     const secondary = collect(next, "videoSecondaryInfoRenderer")[0] ?? {};
@@ -1247,17 +1381,8 @@ export async function browsePage(continuation: string): Promise<Page> {
  */
 /** `lengthSeconds` + storyboard spec, straight from the `player` endpoint. */
 /** Desktop Chrome UA — YouTube serves degraded/bot-checked responses to unknown agents. */
-const BROWSER_UA =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
 /** Decode a raw JSON string body (handles \u0026, \/, \" …) without parsing the whole blob. */
-function jsonStringValue(raw: string): string {
-  try {
-    return JSON.parse(`"${raw}"`) as string;
-  } catch {
-    return raw;
-  }
-}
 
 /**
  * Scrape `ytInitialPlayerResponse` out of the watch page HTML.
@@ -1293,9 +1418,6 @@ async function watchPageMeta(
     storyboardSpec: spec ? jsonStringValue(spec) : "",
   };
 }
-
-/** Public InnerTube key the youtube.com web player itself uses. */
-const INNERTUBE_WEB_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8";
 
 /**
  * `youtubei/v1/player`, shaped the way the real web player shapes it.
