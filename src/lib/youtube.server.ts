@@ -1395,28 +1395,89 @@ export async function browsePage(continuation: string): Promise<Page> {
  * `playabilityStatus: "OK"` together with the full storyboard spec, so this is the
  * path that actually works in production.
  */
+/**
+ * A brand-new anonymous YouTube session.
+ *
+ * `sw.js_data` is 2.8 KB and hands back the same six cookies the 869 KB home
+ * page does (`VISITOR_INFO1_LIVE`, `__Secure-YNID`, `YSC` …), so it is the
+ * cheapest way to look like a browser that has been to youtube.com before.
+ */
+async function freshSessionJar(): Promise<string> {
+  const jar = [CONSENT_COOKIE];
+  try {
+    const res = await fetch("https://www.youtube.com/sw.js_data", {
+      headers: { "user-agent": BROWSER_UA, "accept-language": "en-US,en;q=0.9" },
+    });
+    const set =
+      typeof res.headers.getSetCookie === "function"
+        ? res.headers.getSetCookie()
+        : ([] as string[]);
+    // Drain the body so the connection is released promptly.
+    await res.text().catch(() => "");
+    for (const raw of set) {
+      const pair = raw.split(";")[0]?.trim();
+      if (pair) jar.push(pair);
+    }
+  } catch {
+    /* the consent cookie alone is still worth sending */
+  }
+  return jar.join("; ");
+}
+
+/**
+ * Duration + storyboard spec, scraped from the watch page.
+ *
+ * YouTube serves the watch page to datacentre IPs either fully or with
+ * `playabilityStatus: LOGIN_REQUIRED` and the whole player response stripped —
+ * and *which one you get is a coin flip decided per session*, not per video.
+ * Measured from a cloud host: a reused session is 0/8, while a fresh session
+ * per attempt lands roughly one in three, so retrying with a new cookie jar is
+ * the entire trick. Three videos needed 2, 5 and 4 attempts respectively.
+ *
+ * Each attempt costs ~1.3 MB, hence the explicit budget: callers that merely
+ * want a duration ask for one, the screenshot path asks for several.
+ */
 async function watchPageMeta(
   videoId: string,
+  attempts = 1,
 ): Promise<{ duration: number; storyboardSpec: string }> {
-  const res = await fetch(`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}&hl=en`, {
-    headers: {
-      "user-agent": BROWSER_UA,
-      "accept-language": "en-US,en;q=0.9",
-      accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      // Skips the EU consent interstitial that fronts the watch page from some regions.
-      cookie: "SOCS=CAISEwgDEgk0ODE3Nzk3MjQaAmVuIAEaBgiA_LyaBg",
-    },
-  });
-  if (!res.ok) throw new Error(`watch page → HTTP ${res.status}`);
-  const html = await res.text();
+  let duration = 0;
+  let lastStatus = 0;
 
-  const spec = /"playerStoryboardSpecRenderer":\{"spec":"((?:[^"\\]|\\.)*)"/.exec(html)?.[1] ?? "";
-  const secs = /"lengthSeconds":"(\d+)"/.exec(html)?.[1] ?? "";
+  for (let i = 0; i < Math.max(1, attempts); i++) {
+    const cookie = await freshSessionJar();
+    let html = "";
+    try {
+      const res = await fetch(
+        `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}&hl=en`,
+        {
+          headers: {
+            "user-agent": BROWSER_UA,
+            "accept-language": "en-US,en;q=0.9",
+            accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            referer: "https://www.youtube.com/",
+            cookie,
+          },
+        },
+      );
+      lastStatus = res.status;
+      if (!res.ok) continue;
+      html = await res.text();
+    } catch {
+      continue;
+    }
 
-  return {
-    duration: Number(secs) || 0,
-    storyboardSpec: spec ? jsonStringValue(spec) : "",
-  };
+    if (!duration) duration = Number(/"lengthSeconds":"(\d+)"/.exec(html)?.[1] ?? "") || 0;
+
+    const spec =
+      /"playerStoryboardSpecRenderer":\{"spec":"((?:[^"\\]|\\.)*)"/.exec(html)?.[1] ?? "";
+    if (spec) return { duration, storyboardSpec: jsonStringValue(spec) };
+  }
+
+  if (!duration && lastStatus && lastStatus !== 200) {
+    throw new Error(`watch page → HTTP ${lastStatus}`);
+  }
+  return { duration, storyboardSpec: "" };
 }
 
 /**
@@ -1456,38 +1517,58 @@ async function playerRequest(videoId: string): Promise<Json | null> {
   }
 }
 
+/**
+ * Duration + storyboard spec for a video.
+ *
+ * `attempts` is the watch-page retry budget. Callers that only need a duration
+ * pass 1 and stay fast; the screenshot path spends more because a missing spec
+ * is the difference between the requested moment and the cover image.
+ */
 export async function playerMeta(
   videoId: string,
+  attempts = 1,
 ): Promise<{ duration: number; storyboardSpec: string }> {
-  return cached(`playerMeta:${videoId}`, 6 * 60 * 60 * 1000, async () => {
-    let duration = 0;
-    let storyboardSpec = "";
+  type Meta = { duration: number; storyboardSpec: string };
+  const key = `playerMeta:${videoId}`;
 
-    // 1) Browser-shaped InnerTube player call — ~43 KB, and the cheapest source
-    //    that is known to return a storyboard spec from a server IP.
-    const res = await playerRequest(videoId);
-    if (res) {
-      duration = Number(res?.videoDetails?.lengthSeconds ?? 0) || 0;
-      storyboardSpec =
-        res?.storyboards?.playerStoryboardSpecRenderer?.spec ??
-        collect(res, "playerStoryboardSpecRenderer")[0]?.spec ??
-        "";
+  const entry = cache.get(key);
+  if (entry && Date.now() - entry.at < 6 * 60 * 60 * 1000) {
+    const hit = entry.data as Meta;
+    // A spec-less result means the bot gate won that round — it is not an
+    // answer, so it must never block a later, more determined retry from
+    // trying again for six hours.
+    if (hit.storyboardSpec || attempts <= 1) return hit;
+  }
+
+  let duration = 0;
+  let storyboardSpec = "";
+
+  // 1) Browser-shaped InnerTube player call — ~43 KB, and the cheapest source
+  //    that could return a storyboard spec from a server IP.
+  const res = await playerRequest(videoId);
+  if (res) {
+    duration = Number(res?.videoDetails?.lengthSeconds ?? 0) || 0;
+    storyboardSpec =
+      res?.storyboards?.playerStoryboardSpecRenderer?.spec ??
+      collect(res, "playerStoryboardSpecRenderer")[0]?.spec ??
+      "";
+  }
+
+  // 2) Watch-page HTML — far heavier, but the only source that still answers a
+  //    datacentre IP, and then only to a freshly minted session.
+  if (!storyboardSpec || !duration) {
+    try {
+      const page = await watchPageMeta(videoId, attempts);
+      if (!storyboardSpec) storyboardSpec = page.storyboardSpec;
+      if (!duration) duration = page.duration;
+    } catch {
+      /* keep whatever the API call gave us */
     }
+  }
 
-    // 2) Watch-page HTML (~1.4 MB) — slower, but survives some of the cases where
-    //    the API call is answered with a bot check.
-    if (!storyboardSpec || !duration) {
-      try {
-        const page = await watchPageMeta(videoId);
-        if (!storyboardSpec) storyboardSpec = page.storyboardSpec;
-        if (!duration) duration = page.duration;
-      } catch {
-        /* keep whatever the API call gave us */
-      }
-    }
-
-    return { duration, storyboardSpec };
-  });
+  const result: Meta = { duration, storyboardSpec };
+  if (storyboardSpec || duration) cache.set(key, { at: Date.now(), data: result });
+  return result;
 }
 
 async function fetchAsDataUrl(url: string): Promise<{ dataUrl: string; bytes: number }> {
@@ -1532,12 +1613,14 @@ export async function videoFrame(videoId: string, time: number): Promise<FrameRe
   const problems: string[] = [];
 
   try {
-    const { duration, storyboardSpec } = await playerMeta(videoId);
+    // Worth several swings: this is an explicit "give me this exact frame"
+    // request, and the alternative is handing back the cover image.
+    const { duration, storyboardSpec } = await playerMeta(videoId, 6);
     const levels = parseStoryboardSpec(storyboardSpec);
 
     if (!levels.length) {
       problems.push(
-        storyboardSpec ? "storyboard spec could not be parsed" : "video has no storyboard",
+        storyboardSpec ? "storyboard spec could not be parsed" : "no storyboard available",
       );
     }
 
