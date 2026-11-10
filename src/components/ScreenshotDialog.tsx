@@ -32,6 +32,11 @@ interface Props {
   time: number;
   title?: string;
   channel?: string;
+  /**
+   * Live playback position. The share prompt can sit open for seconds, so the
+   * frame that gets photographed is not the one `time` was pinned to.
+   */
+  getTime?: () => number;
   notify: (m: string) => void;
 }
 
@@ -49,8 +54,13 @@ interface Props {
  *
  * Remembered per browser: dismissing the share prompt turns it off so nobody
  * is nagged twice, and picking "HD" explicitly turns it back on.
+ *
+ * Versioned, and deliberately bumped: the first release of this path captured
+ * the page *including this dialog's own scrim*, so anyone who tried it got a
+ * dimmed frame and said no. That "no" was an answer to a broken feature, not
+ * to this one, so it does not carry over.
  */
-const HD_FIRST_KEY = "yt:screenshot-hd-first";
+const HD_FIRST_KEY = "yt:screenshot-hd-first-v2";
 
 function prefersHdFirst(): boolean {
   try {
@@ -82,6 +92,7 @@ export default function ScreenshotDialog({
   time,
   title,
   channel,
+  getTime,
   notify,
 }: Props) {
   const { t, isAr } = useLanguage();
@@ -92,6 +103,14 @@ export default function ScreenshotDialog({
   const [failed, setFailed] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Read through a ref so an unstable prop can never re-run the capture
+  // effect — that would re-open the browser's share prompt.
+  const getTimeRef = useRef(getTime);
+  useEffect(() => {
+    getTimeRef.current = getTime;
+  }, [getTime]);
 
   const run = useCallback(
     async (nextTier: CaptureTier, nextCard: boolean) => {
@@ -106,6 +125,16 @@ export default function ScreenshotDialog({
         // The player is rendered once at the app root and moved around, so
         // this is the element the HD path crops a tab capture down to.
         cropSelector: "#persistent-player",
+        getTime: () => getTimeRef.current?.() ?? time,
+        // This dialog is a full-viewport scrim with a panel in the middle of
+        // it, painted over the player at z-120. A tab capture photographs the
+        // live page, so it would photograph *this*. Stepping aside is done
+        // imperatively because a state round-trip is not guaranteed to have
+        // painted before the frame is read.
+        onCapturing: (capturing: boolean) => {
+          const el = rootRef.current;
+          if (el) el.style.visibility = capturing ? "hidden" : "";
+        },
       };
       try {
         setResult(await capture(nextTier, opts));
@@ -131,9 +160,17 @@ export default function ScreenshotDialog({
     [videoId, time, title, channel],
   );
 
-  // Capture once per opening; re-run only when a knob actually changes.
-  // Opening the dialog came from a click, so the screen-capture prompt still
-  // has transient activation here.
+  const runRef = useRef(run);
+  useEffect(() => {
+    runRef.current = run;
+  });
+
+  // Capture once per opening. Opening the dialog came from a click, so the
+  // screen-capture prompt still has transient activation here.
+  //
+  // Keyed on `open` alone, on purpose: every other dependency (the playback
+  // position in particular) changes while the dialog is up, and re-running
+  // this would re-open the browser's share prompt behind the user's back.
   useEffect(() => {
     if (!open) return;
     setResult(null);
@@ -141,8 +178,8 @@ export default function ScreenshotDialog({
     setCaptionCard(false);
     const startTier: CaptureTier = isHdCaptureSupported() && prefersHdFirst() ? "hd" : "quick";
     setTier(startTier);
-    void run(startTier, false);
-  }, [open, run]);
+    void runRef.current(startTier, false);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -179,6 +216,8 @@ export default function ScreenshotDialog({
 
   return (
     <div
+      ref={rootRef}
+      data-screenshot-overlay=""
       className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4"
       onClick={onClose}
       role="presentation"

@@ -36,6 +36,24 @@ export interface CaptureOptions {
    * not what "screenshot this video" means.
    */
   cropSelector?: string;
+  /**
+   * Called with `true` before the shared surface is opened and `false` once
+   * the frame is in hand.
+   *
+   * A tab capture photographs the live page, so anything the app paints over
+   * the player ends up in the shot. The screenshot dialog is a full-viewport
+   * scrim with a panel in the middle of it, directly over the player, so
+   * without this the "HD" frame is the video dimmed by 60% black with the
+   * dialog box sitting on top of it. The caller uses this to get out of the
+   * way for the duration.
+   */
+  onCapturing?: (capturing: boolean) => void;
+  /**
+   * Live playback position, sampled at the moment the frame is actually read.
+   * The share prompt sits open for seconds, so the position the dialog was
+   * opened at is not the position that gets photographed.
+   */
+  getTime?: () => number;
 }
 
 export interface CaptureResult {
@@ -215,6 +233,32 @@ export function isHdCaptureSupported(): boolean {
 }
 
 /**
+ * Resolve once the surface has actually presented a frame.
+ *
+ * `requestVideoFrameCallback` fires on presentation, which is the only honest
+ * signal that there is something to draw; the rAF pair covers browsers without
+ * it, and the timeout keeps a surface that never repaints (a paused video in a
+ * still page presents nothing) from hanging the dialog forever.
+ */
+function presentedFrame(video: HTMLVideoElement): Promise<void> {
+  const rvfc = (
+    video as HTMLVideoElement & { requestVideoFrameCallback?: (cb: () => void) => number }
+  ).requestVideoFrameCallback;
+
+  const presented =
+    typeof rvfc === "function"
+      ? new Promise<void>((resolve) => {
+          rvfc.call(video, () => resolve());
+          setTimeout(resolve, 600);
+        })
+      : Promise.resolve();
+
+  return presented.then(
+    () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))),
+  );
+}
+
+/**
  * True-resolution grab of whatever the user shares (prompt defaults to this
  * tab where the browser supports `preferCurrentTab`). The track is stopped the
  * moment a single frame has been read.
@@ -228,7 +272,19 @@ async function captureHd(opts: CaptureOptions): Promise<CaptureResult> {
     audio: false,
   };
 
-  const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+  // Before the surface is opened, not after: the picker is modal browser UI,
+  // so the page has the whole of the user's deliberation to repaint cleanly
+  // and the very first captured frame is already free of our own dialog.
+  opts.onCapturing?.(true);
+
+  let stream: MediaStream;
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+  } catch (e) {
+    opts.onCapturing?.(false);
+    throw e;
+  }
+
   try {
     const track = stream.getVideoTracks()[0];
     if (!track) throw new Error("no video track in the shared surface");
@@ -238,8 +294,7 @@ async function captureHd(opts: CaptureOptions): Promise<CaptureResult> {
     video.muted = true;
     video.playsInline = true;
     await video.play();
-    // one compositor tick so the first frame is actually painted
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await presentedFrame(video);
 
     const width = video.videoWidth || track.getSettings().width || 1280;
     const height = video.videoHeight || track.getSettings().height || 720;
@@ -270,7 +325,9 @@ async function captureHd(opts: CaptureOptions): Promise<CaptureResult> {
     }
 
     const result = await compose(video, crop, opts, {
-      at: opts.time,
+      // The frame on the compositor is the one from *now*, which is seconds
+      // after the dialog was opened if the prompt sat waiting.
+      at: opts.getTime?.() ?? opts.time,
       source: "display",
     });
     video.pause();
@@ -278,6 +335,7 @@ async function captureHd(opts: CaptureOptions): Promise<CaptureResult> {
     return result;
   } finally {
     stream.getTracks().forEach((t) => t.stop());
+    opts.onCapturing?.(false);
   }
 }
 

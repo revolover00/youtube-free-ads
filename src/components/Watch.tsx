@@ -292,6 +292,14 @@ export default function Watch({
   const { playbackTimes } = useAppStore();
   const id = videoIdFromUrl(video.url);
   const currentTime = playbackTimes[id] || 0;
+  // Stable reader for the screenshot dialog: the share prompt sits open for
+  // seconds, so the frame it photographs is the one playing *then*. A ref
+  // keeps the callback identity fixed, which the dialog relies on.
+  const currentTimeRef = useRef(currentTime);
+  useEffect(() => {
+    currentTimeRef.current = currentTime;
+  }, [currentTime]);
+  const readCurrentTime = useCallback(() => currentTimeRef.current, []);
   const [attempt, setAttempt] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [disliked, setDisliked] = useState(false);
@@ -900,6 +908,7 @@ export default function Watch({
         onClose={() => setScreenshot(null)}
         videoId={id}
         time={screenshot?.at ?? currentTime}
+        getTime={readCurrentTime}
         title={data?.title || video.title}
         channel={data?.uploader || video.uploaderName}
         notify={notify}

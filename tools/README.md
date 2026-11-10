@@ -158,16 +158,44 @@ YT_UI_FIXTURE=1 npm run dev          # terminal 1
 LD_LIBRARY_PATH=/tmp/allibs/lib node tools/hd-capture-test.mjs
 ```
 
-`getDisplayMedia` can't be driven headlessly, but `captureHd` only ever
-consumes a `MediaStream` — so the test swaps in a canvas `captureStream()`
-painted green everywhere except the rectangle where `#persistent-player` sits,
-which is pink. A correct capture is therefore pink in the middle. That runs the
-real code: video element, decode wait, `videoWidth`, the
-`displaySurface === "browser"` crop, and `compose`. 6 assertions.
+`getDisplayMedia` cannot be driven here: the headless shell has no surface to
+capture and answers `NotReadableError`. `--headless=new` without
+`--single-process`/`--no-zygote`, plus `--auto-accept-this-tab-capture`, does
+not help either — the prompt is auto-accepted and the capture still fails to
+start. Both were tried; don't retry them.
 
-It also covers the dismissal path: `getDisplayMedia` rejecting with
-`NotAllowedError` must fall back to the server frame rather than leave a
-spinner, and must not re-open the prompt on the next capture.
+**The first version of this test stubbed the surface with a canvas it painted
+itself, and that is exactly how a real defect shipped.** A tab capture
+photographs the *live page*, and this dialog is a full-viewport `bg-black/60`
+scrim with a panel in the middle of it, painted at `z-120` directly over the
+player at `z-20`. So the "HD" frame was the video dimmed to 40 % with the
+dialog box sitting in the shot. A hand-painted surface can never show that; the
+test passed while the feature was broken in the user's hands.
+
+So the surface is now **a real render of the real page**: `page.exposeFunction`
+hands the page a binding that calls Puppeteer's `page.screenshot()` at the
+exact moment `captureHd` opens the surface, and those pixels become the
+`MediaStream`. Only the transport is faked — DOM, layout, paint, crop maths and
+`compose` are all the production path.
+
+To make the crop measurable, `#persistent-player` is tinted `rgb(0,200,255)`
+through an injected `::after` rule. It has to be a stylesheet, not
+`element.style`: React owns that element's inline style and re-applies it on
+the next render, silently undoing a direct mutation. Under the scrim that
+colour becomes `rgb(0,80,102)`, so the two are trivially distinguishable.
+
+12 assertions, sampled at two points — the centre (where the dialog *panel*
+would land) and an off-centre point inside the player (where the bare *scrim*
+would land), because those are different failure modes at different pixels.
+Also covered: the overlay's computed `visibility` at the instant the surface is
+opened, that it is restored afterwards on both the happy and the refused path,
+and that a `NotAllowedError` falls back to the server frame rather than leaving
+a spinner without re-opening the prompt next time.
+
+**Verified to fail on purpose.** With `onCapturing` stubbed out to a no-op (the
+pre-fix behaviour) the suite reports 5 failures, including the scrim colour and
+the overlay visibility; with the fix in place, 12/12. A test for this that has
+never been seen to fail is worth nothing.
 
 ## Why HD is the default capture
 
