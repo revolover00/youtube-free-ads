@@ -85,6 +85,43 @@ IP:
 The two `403`s are the point: `sigh` is a per-level signature, it is mandatory,
 and the parser pairs the right one with each level.
 
+## `extract-json-test.mjs`
+
+Unit tests for `extractJsonVar()` in `src/lib/htmljson.ts`, the brace-matching
+scraper that lifts `ytInitialData` out of a watch page.
+
+```
+node tools/extract-json-test.mjs
+```
+
+18 assertions, no network. The cases that matter are the ones a lazy regex
+(`/var ytInitialData = (\{.*?\});/`) gets wrong — a literal `};` inside a
+string value, a multi-line blob, and the `window["…"]` assignment form. That
+naive implementation fails 4 of the 18, which is exactly why they are there.
+
+## Why `youtubei/v1/next` needs a fallback
+
+YouTube answers **403 to `youtubei/v1/next` from Vercel's serverless IP ranges**
+while still serving `youtubei/v1/search` from the very same host. The home feed
+is built on `search`, so it kept working while *every* watch page died with
+`youtube next → HTTP 403`. Verified in production on fresh ids
+(`jNQXAC9IVRw`, `9bZkp7q19f0`, `kJQP7kiw5Fk`): 206-byte error payloads before
+the fix, full 32–37 KB `StreamData` after it.
+
+Two additive layers in `src/lib/youtube.server.ts` handle it:
+
+1. `innertube()` sends the bare request first — the unchanged fast path, so
+   nothing that already works can regress — and only on 401/403 retries as an
+   attributed web-player session: scraped `visitorData`, `x-goog-visitor-id`,
+   the real client headers and the `SOCS` consent cookie.
+2. `videoDetails()` falls back to the watch page's `ytInitialData`, which is the
+   same renderer tree `next` returns, so every parser downstream is untouched.
+
+Note the asymmetry when testing: the InnerTube endpoints and the `/watch` HTML
+are both reachable from Supabase's egress but **not** from this sandbox, so
+production checks go through `supabase.execute_query` + `public.http()` rather
+than curl.
+
 ## How the storyboard source was diagnosed
 
 `youtubei/v1/player` was called directly from a cloud host (Postgres `http`
