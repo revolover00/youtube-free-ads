@@ -26,3 +26,34 @@ LD_LIBRARY_PATH=/tmp/allibs/lib node tools/screenshot.mjs
 Both details matter: the script must run from the repo root so Node can resolve
 `@sparticuz/chromium`, and `LD_LIBRARY_PATH` must point at the extracted libs or
 Chromium fails with `libnspr4.so: cannot open shared object file`.
+
+## storyboard-test.mjs
+
+Asserts the storyboard spec parsing and frame addressing in
+`src/lib/storyboard.ts` against a real YouTube spec string. Pure logic, no
+browser and no network:
+
+```sh
+node tools/storyboard-test.mjs
+```
+
+This path matters because it cannot be exercised any other way from here —
+the sandbox has no route to `i.ytimg.com`, so the only honest way to check
+that `$L`/`$N`/`$M` substitution and the tile maths are right is to assert
+them directly.
+
+## capture-test.mjs
+
+Drives the Screenshot button in a real browser and checks that the captured
+image is the frame for the requested timestamp:
+
+```sh
+YT_UI_FIXTURE=1 npm run dev
+LD_LIBRARY_PATH=/tmp/allibs/lib node tools/capture-test.mjs
+```
+
+The fixture storyboard is a 5x5 sheet of flat, uniquely coloured tiles, so the
+centre pixel of the result says exactly which tile was cropped. It also
+simulates ~12 seconds of playback progress and asserts the player iframe is
+neither re-`src`-ed nor remounted, since the store now notifies subscribers
+once per second and a mistake there would restart the video continuously.

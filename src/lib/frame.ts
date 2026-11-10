@@ -30,6 +30,12 @@ export interface CaptureOptions {
   channel?: string;
   /** Compose a titled card instead of returning the bare frame. */
   captionCard?: boolean;
+  /**
+   * Element the HD path should crop the shared surface down to. Without it a
+   * tab capture returns the entire page - masthead, guide and all - which is
+   * not what "screenshot this video" means.
+   */
+  cropSelector?: string;
 }
 
 export interface CaptureResult {
@@ -44,6 +50,8 @@ export interface CaptureResult {
   /** Native resolution of the frame before any upscale, for honest labelling. */
   nativeWidth: number;
   nativeHeight: number;
+  /** Why a poster was substituted for the real frame, when that happened. */
+  note?: string;
 }
 
 const TARGET_WIDTH = 1280;
@@ -93,10 +101,13 @@ async function compose(
   source: CanvasImageSource,
   crop: { x: number; y: number; width: number; height: number },
   opts: CaptureOptions,
-  meta: { at: number; source: CaptureSource },
+  meta: { at: number; source: CaptureSource; note?: string },
 ): Promise<CaptureResult> {
   const aspect = crop.height / crop.width;
-  const frameW = Math.max(crop.width, TARGET_WIDTH);
+  // Blowing a 320x180 storyboard tile up to 1280 adds no detail, it just makes
+  // the blur four times bigger. Allow at most a 2x upscale, and never
+  // downscale a source that is already larger (the HD path can be 1920 wide).
+  const frameW = crop.width >= TARGET_WIDTH ? crop.width : Math.min(TARGET_WIDTH, crop.width * 2);
   const frameH = Math.round(frameW * aspect);
 
   const card = !!opts.captionCard;
@@ -176,6 +187,7 @@ async function compose(
     source: meta.source,
     nativeWidth: crop.width,
     nativeHeight: crop.height,
+    ...(meta.note ? { note: meta.note } : {}),
   };
 }
 
@@ -186,6 +198,7 @@ async function captureQuick(opts: CaptureOptions): Promise<CaptureResult> {
   return compose(img, { x: frame.x, y: frame.y, width: frame.width, height: frame.height }, opts, {
     at: frame.at,
     source: frame.source,
+    ...(frame.note ? { note: frame.note } : {}),
   });
 }
 
@@ -231,7 +244,32 @@ async function captureHd(opts: CaptureOptions): Promise<CaptureResult> {
     const width = video.videoWidth || track.getSettings().width || 1280;
     const height = video.videoHeight || track.getSettings().height || 720;
 
-    const result = await compose(video, { x: 0, y: 0, width, height }, opts, {
+    // A tab capture is the viewport, 1:1 with CSS pixels after scaling, so the
+    // player's bounding box can be mapped straight onto it. Any other surface
+    // (a whole screen or another window) has browser chrome and desktop
+    // offsets in the way, so there is no honest mapping and the full frame is
+    // returned instead of a confidently wrong crop.
+    const surface = (track.getSettings() as MediaTrackSettings & { displaySurface?: string })
+      .displaySurface;
+    let crop = { x: 0, y: 0, width, height };
+
+    if (surface === "browser" && opts.cropSelector) {
+      const el = document.querySelector(opts.cropSelector);
+      const r = el?.getBoundingClientRect();
+      if (r && r.width > 0 && r.height > 0) {
+        const scale = width / window.innerWidth;
+        const x = Math.max(0, Math.round(r.left * scale));
+        const y = Math.max(0, Math.round(r.top * scale));
+        crop = {
+          x,
+          y,
+          width: Math.min(width - x, Math.round(r.width * scale)),
+          height: Math.min(height - y, Math.round(r.height * scale)),
+        };
+      }
+    }
+
+    const result = await compose(video, crop, opts, {
       at: opts.time,
       source: "display",
     });

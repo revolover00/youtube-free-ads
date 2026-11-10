@@ -49,6 +49,8 @@ export interface StoryboardFrame {
   at: number;
   /** `storyboard` = real frame at `at`; `poster` = whole-video thumbnail. */
   source: "storyboard" | "poster";
+  /** Why the storyboard was skipped, when `source` is "poster". */
+  note?: string;
 }
 
 export interface StreamData {

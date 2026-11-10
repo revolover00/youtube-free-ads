@@ -6,7 +6,8 @@
  * to YouTube's own public InnerTube endpoint directly.
  */
 
-import { USE_FIXTURE, fixtureVideoDetails, fixtureVideos } from "./fixtures";
+import { addressFrame, parseStoryboardSpec } from "./storyboard";
+import { USE_FIXTURE, fixtureVideoDetails, fixtureVideoFrame, fixtureVideos } from "./fixtures";
 import type {
   ChannelData,
   PipedComment,
@@ -771,6 +772,7 @@ export async function fetchComments(
 
 /** Everything the watch page needs. Playback itself uses the YouTube player. */
 export async function videoDetails(videoId: string): Promise<StreamData> {
+  if (USE_FIXTURE) return fixtureVideoDetails();
   const key = `videoDetails:${videoId}`;
   return cached(key, 60 * 60 * 1000, async () => {
     const next = await innertube("next", { videoId });
@@ -1243,37 +1245,6 @@ export async function browsePage(continuation: string): Promise<Page> {
  *
  * Levels are listed low → high quality; the last one is the biggest.
  */
-export interface StoryboardLevel {
-  url: string;
-  width: number;
-  height: number;
-  frameCount: number;
-  cols: number;
-  rows: number;
-}
-
-export function parseStoryboardSpec(spec: string): StoryboardLevel[] {
-  if (!spec) return [];
-  const parts = spec.split("|");
-  const base = parts.shift();
-  if (!base) return [];
-
-  const levels: StoryboardLevel[] = [];
-  parts.forEach((raw, i) => {
-    const args = raw.split("#");
-    if (args.length < 8) return;
-    const [width, height, frameCount, cols, rows] = args.slice(0, 5).map(Number);
-    const nameReplacement = args[6];
-    const sigh = args[7];
-    if (!width || !height || !frameCount || !cols || !rows) return;
-
-    let url = base.replace("$L", String(i)).replace("$N", nameReplacement ?? "M$M");
-    url += `${url.includes("?") ? "&" : "?"}sigh=${sigh}`;
-    levels.push({ url, width, height, frameCount, cols, rows });
-  });
-  return levels;
-}
-
 /** `lengthSeconds` + storyboard spec, straight from the `player` endpoint. */
 export async function playerMeta(
   videoId: string,
@@ -1314,6 +1285,8 @@ export interface FrameResult {
   /** Timestamp the returned frame actually represents. */
   at: number;
   source: "storyboard" | "poster";
+  /** Why the storyboard was not used, when `source` is "poster". */
+  note?: string;
 }
 
 /**
@@ -1324,37 +1297,42 @@ export interface FrameResult {
  * clips, some live streams); callers must surface which one they got.
  */
 export async function videoFrame(videoId: string, time: number): Promise<FrameResult> {
+  if (USE_FIXTURE) return fixtureVideoFrame(time);
   const at = Math.max(0, Number.isFinite(time) ? time : 0);
+  const problems: string[] = [];
 
   try {
     const { duration, storyboardSpec } = await playerMeta(videoId);
     const levels = parseStoryboardSpec(storyboardSpec);
-    const level = levels.at(-1);
 
-    if (level && duration > 0) {
-      const perSheet = level.cols * level.rows;
-      const frameIndex = Math.min(
-        level.frameCount - 1,
-        Math.max(0, Math.floor((at / duration) * level.frameCount)),
+    if (!levels.length) {
+      problems.push(
+        storyboardSpec ? "storyboard spec could not be parsed" : "video has no storyboard",
       );
-      const sheetIndex = Math.floor(frameIndex / perSheet);
-      const withinSheet = frameIndex % perSheet;
-
-      const url = level.url.replace("$M", String(sheetIndex));
-      const { dataUrl } = await fetchAsDataUrl(url);
-
-      return {
-        sheet: dataUrl,
-        x: (withinSheet % level.cols) * level.width,
-        y: Math.floor(withinSheet / level.cols) * level.height,
-        width: level.width,
-        height: level.height,
-        at: (frameIndex / level.frameCount) * duration,
-        source: "storyboard",
-      };
     }
-  } catch {
-    // fall through to the poster
+
+    // Highest quality first, but genuinely fall back: a single 403 on the top
+    // level used to drop the whole request to the poster, which silently
+    // returns the cover image instead of the requested moment.
+    for (let i = levels.length - 1; i >= 0; i--) {
+      const addr = addressFrame(levels[i]!, at, duration);
+      try {
+        const { dataUrl } = await fetchAsDataUrl(addr.url);
+        return {
+          sheet: dataUrl,
+          x: addr.x,
+          y: addr.y,
+          width: addr.width,
+          height: addr.height,
+          at: addr.at,
+          source: "storyboard",
+        };
+      } catch (e) {
+        problems.push(`level ${i}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+  } catch (e) {
+    problems.push(e instanceof Error ? e.message : String(e));
   }
 
   for (const name of ["maxresdefault", "sddefault", "hqdefault"]) {
@@ -1366,11 +1344,25 @@ export async function videoFrame(videoId: string, time: number): Promise<FrameRe
           : name === "sddefault"
             ? { width: 640, height: 480 }
             : { width: 480, height: 360 };
-      return { sheet: dataUrl, x: 0, y: 0, ...size, at, source: "poster" };
+      return {
+        sheet: dataUrl,
+        x: 0,
+        y: 0,
+        ...size,
+        at,
+        source: "poster",
+        // Surfaced in the dialog so a silent downgrade to the cover image is
+        // explainable instead of just looking like the wrong frame.
+        note: problems[0] ?? "storyboard unavailable",
+      };
     } catch {
       // try the next size down
     }
   }
 
-  throw new Error("no frame source available for this video");
+  throw new Error(
+    problems.length
+      ? `no frame source available (${problems.join("; ")})`
+      : "no frame source available for this video",
+  );
 }

@@ -71,6 +71,9 @@ export default function ScreenshotDialog({
           title,
           channel,
           captionCard: nextCard,
+          // The player is rendered once at the app root and moved around, so
+          // this is the element the HD path crops a tab capture down to.
+          cropSelector: "#persistent-player",
         });
         setResult(r);
       } catch (e) {
@@ -192,7 +195,13 @@ export default function ScreenshotDialog({
           {result?.source === "poster" && (
             <div className="mt-2.5 flex items-start gap-2 rounded-lg bg-[#3a2e00] px-3 py-2 text-[13px] leading-[18px] text-[#ffd95c]">
               <AlertTriangle className="mt-px h-4 w-4 shrink-0" />
-              <span>{t("screenshotSourcePoster")}</span>
+              <span>
+                {t("screenshotSourcePoster")}
+                {/* The server reports why it had to substitute the poster;
+                    without it a failure is indistinguishable from "this video
+                    just has no storyboard". */}
+                {result.note && <span className="block opacity-70">{result.note}</span>}
+              </span>
             </div>
           )}
 

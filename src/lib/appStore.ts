@@ -167,16 +167,27 @@ export const appStore = {
 
   setPlaybackTime(id: string, time: number) {
     if (!id) return;
-    const nextTimes = { ...state.playbackTimes, [id]: Math.floor(time) };
-    state = {
-      ...state,
-      playbackTimes: nextTimes,
-    };
+    const floored = Math.floor(time);
+
+    // The player reports progress ~4x/second. Collapsing to whole seconds
+    // means the object spread, the localStorage write and the notify below
+    // all happen at most once per second instead of on every tick.
+    if (state.playbackTimes[id] === floored) return;
+
+    const nextTimes = { ...state.playbackTimes, [id]: floored };
+    state = { ...state, playbackTimes: nextTimes };
     try {
       localStorage.setItem("yt.progress", JSON.stringify(nextTimes));
-    } catch (e) {
-      // Silent fail
+    } catch {
+      // storage full or blocked in private mode - progress is best-effort
     }
+
+    // This was the only mutator that skipped notify(), so subscribers reading
+    // playbackTimes through useAppStore never learned the position moved.
+    // Anything derived from it - the active chapter, the resume bar on cards,
+    // and the timestamp frame capture uses - only refreshed if an unrelated
+    // render happened to occur first.
+    notify();
   },
 
   getPlaybackTime(id: string): number {
