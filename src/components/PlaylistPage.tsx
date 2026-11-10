@@ -114,7 +114,7 @@ export default function PlaylistPage(props: Props) {
   return (
     <div className="max-w-[1400px] mx-auto px-3 sm:px-6 pt-4 lg:pt-6 flex flex-col lg:flex-row gap-6">
       <aside className="lg:w-80 shrink-0">
-        <div className="rounded-2xl p-5 text-white relative overflow-hidden bg-yt-raised">
+        <div className="rounded-xl p-5 text-white relative overflow-hidden bg-yt-raised">
           {thumbnail && (
             <img
               src={thumbnail}

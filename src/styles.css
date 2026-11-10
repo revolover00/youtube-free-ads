@@ -184,11 +184,18 @@ body {
   background: var(--color-yt-bg);
   color: var(--color-yt-text);
   font-family: var(--font-sans);
-  /* YouTube renders body copy at 14px/20px; everything scales off that. */
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * Body copy default. This must NOT go on <html>: Tailwind's spacing and sizing
+ * utilities are rem-based, so changing the root font size rescales the entire
+ * layout (h-14 becomes 49px, w-60 becomes 210px, and so on). Setting it on
+ * <body> only changes inherited text, which is what we actually want.
+ */
+body {
   font-size: 14px;
   line-height: 20px;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
 }
 
 /* ------------------------------------------------------------------ */

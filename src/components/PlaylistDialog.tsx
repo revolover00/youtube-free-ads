@@ -52,10 +52,10 @@ export default function PlaylistDialog({ open, onClose, video, notify }: Props) 
 
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
 
       <div
-        className="relative w-full max-w-md bg-yt-raised border border-yt-border rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+        className="relative w-full max-w-md bg-yt-raised border border-yt-border rounded-xl shadow-[0_4px_32px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 duration-200"
         dir={dir}
       >
         <div className="flex items-center justify-between p-4 border-b border-yt-border">

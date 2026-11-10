@@ -310,7 +310,7 @@ export default function Sidebar({
             mobileOpen ? "translate-x-0" : isAr ? "translate-x-full" : "-translate-x-full"
           }`}
         >
-          <div className="h-14 flex items-center gap-2 px-4 sticky top-0 bg-yt-bg z-10 border-b border-yt-border/30">
+          <div className="h-14 flex items-center gap-2 px-4 sticky top-0 bg-yt-bg z-10 border-b border-yt-border">
             <button
               onClick={onCloseMobile}
               className="w-10 h-10 -ms-2 rounded-full hover:bg-yt-surface grid place-items-center"

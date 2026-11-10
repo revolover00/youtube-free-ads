@@ -159,7 +159,7 @@ function QueuePanel({ onOpen }: { onOpen: (v: PipedVideo) => void }) {
   return (
     <div className="mb-4 rounded-xl border border-yt-border bg-yt-raised shadow-md overflow-hidden animate-in fade-in duration-200">
       {/* Queue Header */}
-      <div className="flex items-center justify-between px-3.5 py-2.5 bg-yt-surface/80 border-b border-yt-border/60">
+      <div className="flex items-center justify-between px-3.5 py-2.5 bg-yt-surface border-b border-yt-border/60">
         <div className="flex items-center gap-2">
           <ListVideo className="w-4 h-4 text-yt-blue shrink-0" />
           <h3 className="text-xs sm:text-sm font-bold text-yt-text">
@@ -198,7 +198,7 @@ function QueuePanel({ onOpen }: { onOpen: (v: PipedVideo) => void }) {
               <div
                 key={`${id}-${idx}`}
                 className={`group flex items-center gap-2 p-1.5 rounded-lg transition-colors ${
-                  isPlaying ? "bg-yt-blue/15 border border-yt-blue/30" : "hover:bg-yt-surface/60"
+                  isPlaying ? "bg-yt-blue/15 border border-yt-blue/30" : "hover:bg-yt-surface"
                 }`}
               >
                 {/* Index / Playing icon */}
@@ -225,7 +225,7 @@ function QueuePanel({ onOpen }: { onOpen: (v: PipedVideo) => void }) {
                       className="w-full h-full object-cover"
                     />
                     {item.duration > 0 && (
-                      <span className="absolute bottom-0.5 end-0.5 text-[9px] bg-black/80 px-1 rounded text-white font-mono">
+                      <span className="absolute bottom-0.5 end-0.5 text-[9px] bg-black/60 px-1 rounded text-white font-mono">
                         {fmtDuration(item.duration)}
                       </span>
                     )}
@@ -1068,7 +1068,7 @@ export default function Watch({
 
         {/* Video Chapters Box (Collapsible) */}
         {chapters.length > 0 && (
-          <div className="mt-4 rounded-xl border border-yt-border bg-yt-surface/90 overflow-hidden shadow-xs">
+          <div className="mt-4 rounded-xl border border-yt-border bg-yt-surface overflow-hidden shadow-xs">
             <button
               type="button"
               onClick={() => setChaptersCollapsed((c) => !c)}
@@ -1179,7 +1179,7 @@ export default function Watch({
         <div className="lg:hidden mt-3">
           <div
             onClick={() => setMobileCommentsOpen(true)}
-            className="p-3 sm:p-4 rounded-xl bg-yt-surface/90 hover:bg-yt-surface border border-yt-border/40 transition-all cursor-pointer select-none shadow-xs"
+            className="p-3 sm:p-4 rounded-xl bg-yt-surface hover:bg-yt-surface border border-yt-border transition-all cursor-pointer select-none shadow-xs"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -1199,7 +1199,7 @@ export default function Watch({
 
             {/* Top comment preview */}
             {commentsList.length > 0 ? (
-              <div className="flex items-start gap-2.5 mt-2.5 pt-2 border-t border-yt-border/30">
+              <div className="flex items-start gap-2.5 mt-2.5 pt-2 border-t border-yt-border">
                 <Avatar
                   src={commentsList[0].thumbnail}
                   name={commentsList[0].author}
@@ -1213,7 +1213,7 @@ export default function Watch({
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-yt-sub mt-2 pt-2 border-t border-yt-border/30">
+              <p className="text-xs text-yt-sub mt-2 pt-2 border-t border-yt-border">
                 {isAr
                   ? "انقر لإضافة تعليق أو قراءة التعليقات..."
                   : "Tap to add or read comments..."}
@@ -1247,7 +1247,7 @@ export default function Watch({
 
           {/* Inline comments for mobile/tablet when toggled */}
           {showInlineComments && (
-            <div className="mt-3 p-3.5 sm:p-4 rounded-xl bg-yt-raised border border-yt-border/40 space-y-4 animate-in fade-in duration-200">
+            <div className="mt-3 p-3.5 sm:p-4 rounded-xl bg-yt-raised border border-yt-border space-y-4 animate-in fade-in duration-200">
               <div className="flex gap-2.5 items-center">
                 <span className="w-8 h-8 rounded-full grid place-items-center text-xs font-bold bg-yt-blue text-[#0f0f0f] shrink-0">
                   {isAr ? "أ" : "U"}
@@ -1459,12 +1459,12 @@ export default function Watch({
           />
 
           {/* Sheet panel */}
-          <div className="relative z-10 w-full max-h-[84vh] h-[84vh] bg-yt-raised border-t border-yt-border/60 rounded-t-2xl shadow-2xl flex flex-col animate-in slide-in-from-bottom duration-200">
+          <div className="relative z-10 w-full max-h-[84vh] h-[84vh] bg-yt-raised border-t border-yt-border/60 rounded-t-2xl shadow-[0_4px_32px_rgba(0,0,0,0.5)] flex flex-col animate-in slide-in-from-bottom duration-200">
             {/* Grab handle */}
             <div className="w-10 h-1 rounded-full bg-yt-sub/40 mx-auto mt-2.5 mb-1 shrink-0" />
 
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-yt-border/40 shrink-0">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-yt-border shrink-0">
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-base text-yt-text">{t("comments")}</h3>
                 <span className="text-xs text-yt-sub tabular-nums">{formattedCommentsCount}</span>
@@ -1479,7 +1479,7 @@ export default function Watch({
             </div>
 
             {/* Write comment input */}
-            <div className="px-4 py-3 border-b border-yt-border/30 shrink-0 flex gap-3 items-center">
+            <div className="px-4 py-3 border-b border-yt-border shrink-0 flex gap-3 items-center">
               <span className="w-8 h-8 rounded-full grid place-items-center text-xs font-bold bg-yt-blue text-[#0f0f0f] shrink-0">
                 {isAr ? "أ" : "U"}
               </span>

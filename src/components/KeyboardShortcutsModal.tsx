@@ -47,11 +47,11 @@ export default function KeyboardShortcutsModal({ open, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150"
+      className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl bg-yt-raised border border-yt-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+        className="w-full max-w-xl bg-yt-raised border border-yt-border rounded-xl shadow-[0_4px_32px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[85vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -77,7 +77,7 @@ export default function KeyboardShortcutsModal({ open, onClose }: Props) {
           {shortcuts.map((item, idx) => (
             <div
               key={idx}
-              className="flex items-center justify-between py-2 px-2 hover:bg-yt-surface/50 rounded-lg transition-colors gap-4"
+              className="flex items-center justify-between py-2 px-2 hover:bg-yt-surface rounded-lg transition-colors gap-4"
             >
               <span className="text-sm font-medium text-yt-text/90">
                 {isAr ? item.descAr : item.descEn}

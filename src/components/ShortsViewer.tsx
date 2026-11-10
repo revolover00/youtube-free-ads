@@ -246,10 +246,8 @@ function RailBtn({
   return (
     <button onClick={onClick} className="flex flex-col items-center gap-1 group" aria-label={label}>
       <span
-        className={`w-12 h-12 rounded-full grid place-items-center transition-all group-active:scale-90 ${
-          active
-            ? "bg-white/20 text-yt-blue"
-            : "bg-black/40 backdrop-blur-sm hover:bg-black/60 text-white"
+        className={`w-12 h-12 rounded-full grid place-items-center transition-all group- ${
+          active ? "bg-white/20 text-yt-blue" : "bg-black/40 hover:bg-black/60 text-white"
         }`}
       >
         {icon}

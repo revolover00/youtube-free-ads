@@ -1734,7 +1734,7 @@ export default function App() {
 
       {/* mobile bottom nav */}
       {!inWatch && (
-        <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-yt-bg/95 backdrop-blur border-t border-yt-border flex items-stretch h-14 pb-[env(safe-area-inset-bottom)]">
+        <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-yt-bg border-t border-yt-border flex items-stretch h-14 pb-[env(safe-area-inset-bottom)]">
           <BottomItem
             icon={<Home className="w-6 h-6" />}
             label={t("home")}
@@ -1751,7 +1751,7 @@ export default function App() {
             className="flex-1 grid place-items-center"
             aria-label={t("create")}
           >
-            <span className="w-11 h-8 rounded-xl bg-yt-surface hover:bg-yt-hover active:scale-90 transition-all grid place-items-center">
+            <span className="w-11 h-8 rounded-xl bg-yt-surface hover:bg-yt-hover transition-all grid place-items-center">
               <Plus className="w-6 h-6" />
             </span>
           </button>
@@ -1774,7 +1774,7 @@ export default function App() {
       {createOpen && (
         <div className="fixed inset-0 z-[60] flex items-end md:items-center md:justify-center">
           <div className="absolute inset-0 bg-black/60" onClick={() => setCreateOpen(false)} />
-          <div className="dropdown-in relative w-full md:w-80 bg-yt-raised rounded-t-2xl md:rounded-2xl border border-yt-border p-3 pb-6 md:pb-3">
+          <div className="dropdown-in relative w-full md:w-80 bg-yt-raised rounded-t-2xl md:rounded-xl border border-yt-border p-3 pb-6 md:pb-3">
             <div className="flex items-center justify-between px-2 py-2">
               <span className="font-bold">{t("create")}</span>
               <button
@@ -1916,14 +1916,14 @@ export default function App() {
           />
 
           {autoplayCountdown && (
-            <div className="absolute inset-0 z-40 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-4 text-white text-center animate-in fade-in duration-200 select-none">
+            <div className="absolute inset-0 z-40 bg-black/85 flex flex-col items-center justify-center p-4 text-white text-center animate-in fade-in duration-200 select-none">
               <div className="text-xs font-bold uppercase tracking-wider text-yt-sub mb-1">
                 {isAr ? "الفيديو التالي خلال" : "Up Next in"}
               </div>
               <div className="text-4xl font-extrabold text-yt-blue font-mono mb-3">
                 {autoplayCountdown.secondsLeft}
               </div>
-              <div className="flex items-center gap-3 max-w-sm w-full bg-yt-surface/80 p-2.5 rounded-xl border border-yt-border/50 text-start mb-4 shadow-lg">
+              <div className="flex items-center gap-3 max-w-sm w-full bg-yt-surface p-2.5 rounded-xl border border-yt-border/50 text-start mb-4 shadow-lg">
                 <img
                   src={
                     autoplayCountdown.nextVideo.thumbnail ||
@@ -1963,7 +1963,7 @@ export default function App() {
 
       {/* Floating Notification Toast */}
       {toast && (
-        <div className="fixed bottom-16 md:bottom-6 start-1/2 -translate-x-1/2 z-[70] bg-yt-raised border border-yt-border px-5 py-2.5 rounded-full shadow-2xl shadow-black text-sm font-medium flex items-center gap-3 animate-in fade-in slide-in-from-bottom-3 duration-200">
+        <div className="fixed bottom-16 md:bottom-6 start-1/2 -translate-x-1/2 z-[70] bg-yt-raised border border-yt-border px-5 py-2.5 rounded-full shadow-[0_4px_32px_rgba(0,0,0,0.5)] shadow-black text-sm font-medium flex items-center gap-3 animate-in fade-in slide-in-from-bottom-3 duration-200">
           <span>{typeof toast === "string" ? toast : toast.message}</span>
           {typeof toast !== "string" && toast.actionLabel && toast.onAction && (
             <button

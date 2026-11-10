@@ -134,7 +134,7 @@ export default function ChannelPage({
   if (!data)
     return (
       <div className="max-w-[1280px] mx-auto px-3 sm:px-6 pt-4">
-        <div className="h-40 rounded-2xl bg-yt-surface animate-pulse mb-8" />
+        <div className="h-40 rounded-xl bg-yt-surface animate-pulse mb-8" />
         <SkeletonGrid count={4} />
       </div>
     );

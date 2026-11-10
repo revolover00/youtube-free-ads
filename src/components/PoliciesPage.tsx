@@ -76,7 +76,7 @@ export default function PoliciesPage({ onBackToHome }: PoliciesPageProps) {
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
                 isActive
                   ? "bg-white text-black font-semibold shadow-md"
-                  : "bg-yt-surface/60 text-yt-sub hover:text-white hover:bg-yt-surface"
+                  : "bg-yt-surface text-yt-sub hover:text-white hover:bg-yt-surface"
               }`}
             >
               <Icon className="w-4 h-4" />
@@ -89,7 +89,7 @@ export default function PoliciesPage({ onBackToHome }: PoliciesPageProps) {
       {/* Content Area */}
       <div className="space-y-6">
         {activeTab === "terms" && (
-          <section className="space-y-6 bg-yt-raised/50 border border-yt-border rounded-2xl p-6 md:p-8">
+          <section className="space-y-6 bg-yt-raised/50 border border-yt-border rounded-xl p-6 md:p-8">
             <div className="border-b border-yt-border pb-4">
               <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
                 <Scale className="w-5 h-5 text-yt-red" />
@@ -101,7 +101,7 @@ export default function PoliciesPage({ onBackToHome }: PoliciesPageProps) {
             </div>
 
             <div className="space-y-4 text-sm leading-relaxed text-yt-text/90">
-              <div className="p-4 rounded-xl bg-yt-surface/50 border border-yt-border">
+              <div className="p-4 rounded-xl bg-yt-surface border border-yt-border">
                 <h3 className="font-bold text-white mb-1.5">
                   {isAr ? "1. طبيعة المنصة والتطبيق" : "1. Nature of the Service"}
                 </h3>
@@ -112,7 +112,7 @@ export default function PoliciesPage({ onBackToHome }: PoliciesPageProps) {
                 </p>
               </div>
 
-              <div className="p-4 rounded-xl bg-yt-surface/50 border border-yt-border">
+              <div className="p-4 rounded-xl bg-yt-surface border border-yt-border">
                 <h3 className="font-bold text-white mb-1.5">
                   {isAr ? "2. الاستخدام المسموح به" : "2. Permitted Use"}
                 </h3>
@@ -135,7 +135,7 @@ export default function PoliciesPage({ onBackToHome }: PoliciesPageProps) {
                 </ul>
               </div>
 
-              <div className="p-4 rounded-xl bg-yt-surface/50 border border-yt-border">
+              <div className="p-4 rounded-xl bg-yt-surface border border-yt-border">
                 <h3 className="font-bold text-white mb-1.5">
                   {isAr ? "3. شروط أطراف ثالثة (YouTube)" : "3. Third-Party Terms"}
                 </h3>
@@ -170,7 +170,7 @@ export default function PoliciesPage({ onBackToHome }: PoliciesPageProps) {
         )}
 
         {activeTab === "privacy" && (
-          <section className="space-y-6 bg-yt-raised/50 border border-yt-border rounded-2xl p-6 md:p-8">
+          <section className="space-y-6 bg-yt-raised/50 border border-yt-border rounded-xl p-6 md:p-8">
             <div className="border-b border-yt-border pb-4">
               <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
                 <Lock className="w-5 h-5 text-blue-400" />
@@ -184,7 +184,7 @@ export default function PoliciesPage({ onBackToHome }: PoliciesPageProps) {
             </div>
 
             <div className="space-y-4 text-sm leading-relaxed text-yt-text/90">
-              <div className="p-4 rounded-xl bg-yt-surface/50 border border-yt-border">
+              <div className="p-4 rounded-xl bg-yt-surface border border-yt-border">
                 <h3 className="font-bold text-white mb-1.5 flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                   <span>{isAr ? "البيانات المخزنة محلياً" : "Locally Stored Data"}</span>
@@ -196,7 +196,7 @@ export default function PoliciesPage({ onBackToHome }: PoliciesPageProps) {
                 </p>
               </div>
 
-              <div className="p-4 rounded-xl bg-yt-surface/50 border border-yt-border">
+              <div className="p-4 rounded-xl bg-yt-surface border border-yt-border">
                 <h3 className="font-bold text-white mb-1.5 flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                   <span>{isAr ? "بيانات الحساب والمزامنة السحابية" : "Account & Cloud Sync"}</span>
@@ -208,7 +208,7 @@ export default function PoliciesPage({ onBackToHome }: PoliciesPageProps) {
                 </p>
               </div>
 
-              <div className="p-4 rounded-xl bg-yt-surface/50 border border-yt-border">
+              <div className="p-4 rounded-xl bg-yt-surface border border-yt-border">
                 <h3 className="font-bold text-white mb-1.5 flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                   <span>{isAr ? "انعدام التتبع والإعلانات التجسسية" : "No Ad Tracking"}</span>
@@ -224,7 +224,7 @@ export default function PoliciesPage({ onBackToHome }: PoliciesPageProps) {
         )}
 
         {activeTab === "copyright" && (
-          <section className="space-y-6 bg-yt-raised/50 border border-yt-border rounded-2xl p-6 md:p-8">
+          <section className="space-y-6 bg-yt-raised/50 border border-yt-border rounded-xl p-6 md:p-8">
             <div className="border-b border-yt-border pb-4">
               <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
                 <FileText className="w-5 h-5 text-amber-400" />
@@ -238,7 +238,7 @@ export default function PoliciesPage({ onBackToHome }: PoliciesPageProps) {
             </div>
 
             <div className="space-y-4 text-sm leading-relaxed text-yt-text/90">
-              <div className="p-4 rounded-xl bg-yt-surface/50 border border-yt-border">
+              <div className="p-4 rounded-xl bg-yt-surface border border-yt-border">
                 <h3 className="font-bold text-white mb-1.5">
                   {isAr ? "حقوق صانعي الفيديو والقنوات" : "Content Creators Ownership"}
                 </h3>
@@ -249,7 +249,7 @@ export default function PoliciesPage({ onBackToHome }: PoliciesPageProps) {
                 </p>
               </div>
 
-              <div className="p-4 rounded-xl bg-yt-surface/50 border border-yt-border">
+              <div className="p-4 rounded-xl bg-yt-surface border border-yt-border">
                 <h3 className="font-bold text-white mb-1.5">
                   {isAr ? "العلامات التجارية" : "Trademark Notice"}
                 </h3>
@@ -276,7 +276,7 @@ export default function PoliciesPage({ onBackToHome }: PoliciesPageProps) {
         )}
 
         {activeTab === "google" && (
-          <section className="space-y-6 bg-yt-raised/50 border border-yt-border rounded-2xl p-6 md:p-8">
+          <section className="space-y-6 bg-yt-raised/50 border border-yt-border rounded-xl p-6 md:p-8">
             <div className="border-b border-yt-border pb-4">
               <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
                 <ShieldCheck className="w-5 h-5 text-emerald-400" />
@@ -292,7 +292,7 @@ export default function PoliciesPage({ onBackToHome }: PoliciesPageProps) {
             </div>
 
             <div className="space-y-4 text-sm leading-relaxed text-yt-text/90">
-              <div className="p-4 rounded-xl bg-yt-surface/50 border border-yt-border">
+              <div className="p-4 rounded-xl bg-yt-surface border border-yt-border">
                 <h3 className="font-bold text-white mb-1.5">
                   {isAr ? "نطاقات الصلاحيات المطلوبة (OAuth Scopes)" : "Requested OAuth Scopes"}
                 </h3>
@@ -307,7 +307,7 @@ export default function PoliciesPage({ onBackToHome }: PoliciesPageProps) {
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-yt-surface/50 border border-yt-border">
+              <div className="p-4 rounded-xl bg-yt-surface border border-yt-border">
                 <h3 className="font-bold text-white mb-1.5">
                   {isAr ? "استخدام البيانات الحصري" : "Limited Use Policy"}
                 </h3>

@@ -346,7 +346,7 @@ export default function LibraryPage(props: Props) {
                     <ListVideo className="w-10 h-10 text-yt-sub opacity-20" />
                   </div>
                 )}
-                <div className="absolute inset-y-0 end-0 w-2/5 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center text-white border-s border-white/10">
+                <div className="absolute inset-y-0 end-0 w-2/5 bg-black/70 flex flex-col items-center justify-center text-white border-s border-white/10">
                   <ListVideo className="w-5 h-5 mb-1" />
                   <span className="font-bold">{pl.count}</span>
                 </div>
@@ -414,7 +414,7 @@ export default function LibraryPage(props: Props) {
       <div className="max-w-[1400px] mx-auto px-3 sm:px-6 pt-4 lg:pt-6 flex flex-col lg:flex-row gap-6">
         <aside className="lg:w-80 shrink-0">
           <div
-            className="rounded-2xl p-5 text-white relative overflow-hidden"
+            className="rounded-xl p-5 text-white relative overflow-hidden"
             style={{
               background:
                 normalized === "liked"

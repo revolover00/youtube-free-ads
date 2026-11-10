@@ -57,7 +57,7 @@ export default function DebugPanel() {
   return (
     <div className="fixed end-4 bottom-20 md:bottom-4 z-[95] flex flex-col items-end gap-2">
       {open && (
-        <div className="dropdown-in w-[min(640px,94vw)] max-h-[75vh] flex flex-col rounded-xl border border-yt-border bg-[#0a0a0a]/97 backdrop-blur shadow-2xl shadow-black/70 overflow-hidden text-xs">
+        <div className="dropdown-in w-[min(640px,94vw)] max-h-[75vh] flex flex-col rounded-xl border border-yt-border bg-[#0a0a0a]/97 shadow-[0_4px_32px_rgba(0,0,0,0.5)] shadow-black/70 overflow-hidden text-xs">
           {/* Header */}
           <div className="flex items-center gap-2 px-3 py-2 border-b border-yt-border shrink-0 bg-yt-raised/40">
             <Bug className="w-4 h-4 text-yt-blue" />
@@ -133,7 +133,7 @@ export default function DebugPanel() {
                 <>
                   {/* Summary Bar */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <div className="p-2 rounded-lg bg-yt-surface/60 border border-yt-border">
+                    <div className="p-2 rounded-lg bg-yt-surface border border-yt-border">
                       <div className="text-[10px] text-yt-sub">وقت البناء</div>
                       <div className="font-mono font-bold text-yt-text">
                         {new Date(feedDiag.builtAt).toLocaleTimeString()}
@@ -142,7 +142,7 @@ export default function DebugPanel() {
                         {feedDiag.buildMs} ms
                       </div>
                     </div>
-                    <div className="p-2 rounded-lg bg-yt-surface/60 border border-yt-border">
+                    <div className="p-2 rounded-lg bg-yt-surface border border-yt-border">
                       <div className="text-[10px] text-yt-sub">طبيعة الفيد</div>
                       <div className="font-bold">
                         {feedDiag.coldStart ? (
@@ -155,7 +155,7 @@ export default function DebugPanel() {
                         {feedDiag.signalCount} إشارة تفاعل
                       </div>
                     </div>
-                    <div className="p-2 rounded-lg bg-yt-surface/60 border border-yt-border">
+                    <div className="p-2 rounded-lg bg-yt-surface border border-yt-border">
                       <div className="text-[10px] text-yt-sub">حجم المجمع / الناتج</div>
                       <div className="font-mono font-bold text-yt-text">
                         {feedDiag.poolSize} مرشح ← {feedDiag.finalCount}
@@ -164,7 +164,7 @@ export default function DebugPanel() {
                         مكتوم: {feedDiag.mutedCount}
                       </div>
                     </div>
-                    <div className="p-2 rounded-lg bg-yt-surface/60 border border-yt-border">
+                    <div className="p-2 rounded-lg bg-yt-surface border border-yt-border">
                       <div className="text-[10px] text-yt-sub">سلامة المصادر</div>
                       <div className="font-bold">
                         {feedDiag.errors.length > 0 ? (
@@ -318,7 +318,7 @@ export default function DebugPanel() {
                                     {Object.entries(item.parts || {}).map(([k, v]) => (
                                       <span
                                         key={k}
-                                        className="px-1 py-0.5 rounded bg-black/40 border border-yt-border/40 text-yt-sub"
+                                        className="px-1 py-0.5 rounded bg-black/40 border border-yt-border text-yt-sub"
                                       >
                                         {k.slice(0, 3)}: {(v as number).toFixed(2)}
                                       </span>
@@ -404,7 +404,7 @@ export default function DebugPanel() {
 
       <button
         onClick={() => setOpen((o) => !o)}
-        className={`relative w-11 h-11 rounded-full border grid place-items-center shadow-lg shadow-black/50 transition-all active:scale-90 ${
+        className={`relative w-11 h-11 rounded-full border grid place-items-center shadow-lg shadow-black/50 transition-all ${
           open
             ? "bg-yt-blue text-black border-yt-blue"
             : entries.length > 0 || feedDiag

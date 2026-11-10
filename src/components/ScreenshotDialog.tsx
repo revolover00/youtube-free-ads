@@ -128,7 +128,7 @@ export default function ScreenshotDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 p-4"
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4"
       onClick={onClose}
       role="presentation"
     >
@@ -136,7 +136,7 @@ export default function ScreenshotDialog({
         role="dialog"
         aria-modal="true"
         aria-label={t("screenshotTitle")}
-        className="w-full max-w-[720px] max-h-[92vh] overflow-y-auto rounded-xl bg-yt-raised text-yt-text shadow-2xl shadow-black/70"
+        className="w-full max-w-[720px] max-h-[92vh] overflow-y-auto rounded-xl bg-yt-raised text-yt-text shadow-[0_4px_32px_rgba(0,0,0,0.5)] shadow-black/70"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 px-5 py-4">

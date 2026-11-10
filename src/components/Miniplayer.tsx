@@ -169,7 +169,7 @@ export default function Miniplayer({ video, onExpand, onClose }: Props) {
       }
       className={`fixed ${
         !position ? "bottom-16 sm:bottom-6 end-2 sm:end-6" : ""
-      } z-[45] w-[320px] sm:w-[380px] max-w-[calc(100vw-16px)] rounded-xl overflow-hidden bg-yt-raised border border-yt-border shadow-2xl shadow-black/90 flex flex-col select-none touch-none cursor-grab active:cursor-grabbing transition-shadow ${
+      } z-[45] w-[320px] sm:w-[380px] max-w-[calc(100vw-16px)] rounded-xl overflow-hidden bg-yt-raised border border-yt-border shadow-[0_4px_32px_rgba(0,0,0,0.5)] shadow-black/90 flex flex-col select-none touch-none cursor-grab active:cursor-grabbing transition-shadow ${
         isDragging
           ? "shadow-cyan-500/20 scale-[1.02]"
           : "animate-in slide-in-from-bottom-5 fade-in-50"
@@ -195,7 +195,7 @@ export default function Miniplayer({ video, onExpand, onClose }: Props) {
               e.stopPropagation();
               onExpand();
             }}
-            className="w-8 h-8 rounded-full bg-black/80 hover:bg-black text-white grid place-items-center shadow-md transition-transform"
+            className="w-8 h-8 rounded-full bg-black/60 hover:bg-black text-white grid place-items-center shadow-md transition-transform"
             title={t("expand")}
             aria-label={t("expand")}
           >
@@ -206,7 +206,7 @@ export default function Miniplayer({ video, onExpand, onClose }: Props) {
               e.stopPropagation();
               onClose();
             }}
-            className="w-8 h-8 rounded-full bg-black/80 hover:bg-black text-white grid place-items-center shadow-md transition-transform"
+            className="w-8 h-8 rounded-full bg-black/60 hover:bg-black text-white grid place-items-center shadow-md transition-transform"
             title={t("closeMiniplayer")}
             aria-label={t("closeMiniplayer")}
           >
@@ -216,7 +216,7 @@ export default function Miniplayer({ video, onExpand, onClose }: Props) {
       </div>
 
       {/* Miniplayer metadata & control footer */}
-      <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-yt-raised hover:bg-yt-surface/80 transition-colors">
+      <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-yt-raised hover:bg-yt-surface transition-colors">
         <div className="flex-1 min-w-0">
           <h4 className="text-[13px] font-medium leading-snug line-clamp-1 text-yt-text hover:text-white">
             {video.title || t("miniplayer")}

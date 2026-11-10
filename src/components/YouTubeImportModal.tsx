@@ -306,14 +306,14 @@ export function YouTubeImportModal({ isOpen, onClose, onImportSuccess }: Props) 
   return (
     <div
       id="yt-import-modal-overlay"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 animate-in fade-in duration-200"
     >
       <div
         id="yt-import-modal-card"
-        className="relative w-full max-w-lg bg-yt-nav border border-yt-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="relative w-full max-w-lg bg-yt-nav border border-yt-border rounded-xl shadow-[0_4px_32px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh]"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-yt-border bg-yt-surface/50">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-yt-border bg-yt-surface">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-red-600/15 flex items-center justify-center text-red-500">
               <Youtube className="w-5 h-5" />
@@ -462,10 +462,10 @@ export function YouTubeImportModal({ isOpen, onClose, onImportSuccess }: Props) 
                 onDragLeave={() => setDragOver(false)}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center gap-3 text-center cursor-pointer transition-all ${
+                className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center gap-3 text-center cursor-pointer transition-all ${
                   dragOver
                     ? "border-red-500 bg-red-500/10 scale-[1.01]"
-                    : "border-yt-border hover:border-red-500/60 hover:bg-yt-surface/50"
+                    : "border-yt-border hover:border-red-500/60 hover:bg-yt-surface"
                 }`}
               >
                 <input

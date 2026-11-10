@@ -250,7 +250,7 @@ function CardMenu({
           align="end"
           side="bottom"
           sideOffset={6}
-          className="z-[999] w-56 rounded-xl bg-yt-raised border border-yt-border py-1.5 shadow-2xl shadow-black/80 text-yt-text backdrop-blur-none animate-in fade-in zoom-in-95 duration-150"
+          className="z-[999] w-56 rounded-xl bg-yt-raised border border-yt-border py-1.5 shadow-[0_4px_32px_rgba(0,0,0,0.5)] shadow-black/80 text-yt-text backdrop-blur-none animate-in fade-in zoom-in-95 duration-150"
           onClick={(e) => e.stopPropagation()}
         >
           {items.map((it) => (
@@ -408,12 +408,12 @@ export function VideoCard({
         </span>
       ) : null}
       {isWatched && (
-        <span className="absolute top-2 start-2 z-10 rounded bg-black/80 px-1 py-[3px] text-[12px] font-medium leading-3 text-white">
+        <span className="absolute top-2 start-2 z-10 rounded bg-black/60 px-1 py-[3px] text-[12px] font-medium leading-3 text-white">
           {lang === "ar" ? "تمت المشاهدة" : "Watched"}
         </span>
       )}
       {saved && (
-        <span className="absolute top-2 end-2 z-10 flex items-center gap-1 rounded bg-black/80 px-1 py-[3px] text-[12px] font-medium leading-3 text-white">
+        <span className="absolute top-2 end-2 z-10 flex items-center gap-1 rounded bg-black/60 px-1 py-[3px] text-[12px] font-medium leading-3 text-white">
           <Clock className="w-3 h-3" /> {lang === "ar" ? "محفوظ" : "Saved"}
         </span>
       )}
@@ -605,7 +605,7 @@ export function PlaylistCard({
         ) : (
           <div className="w-full h-full bg-yt-surface" />
         )}
-        <div className="absolute inset-y-0 end-0 w-2/5 bg-black/70 backdrop-blur-sm flex flex-col items-center justify-center text-white">
+        <div className="absolute inset-y-0 end-0 w-2/5 bg-black/70 flex flex-col items-center justify-center text-white">
           <ListVideo className="w-5 h-5 mb-1" />
           <span className="font-bold text-sm">{playlist.videoCount || ""}</span>
           <span className="text-[11px]">{lang === "ar" ? "فيديو" : "videos"}</span>

@@ -215,7 +215,7 @@ export default function Header({
           )}
           <button
             onClick={onHome}
-            className="flex items-center gap-1.5 px-1.5 h-10 rounded-lg hover:bg-yt-surface/60 transition-colors"
+            className="flex items-center gap-1.5 px-1.5 h-10 rounded-lg hover:bg-yt-surface transition-colors"
             aria-label="YouTube"
           >
             <LogoIcon className="w-7 h-5" />
@@ -277,7 +277,7 @@ export default function Header({
             </button>
 
             {showSuggestions && (
-              <div className="dropdown-in absolute top-11 inset-x-0 z-50 bg-yt-raised rounded-xl border border-yt-border py-2 shadow-2xl shadow-black/70">
+              <div className="dropdown-in absolute top-11 inset-x-0 z-50 bg-yt-raised rounded-xl border border-yt-border py-2 shadow-[0_4px_32px_rgba(0,0,0,0.5)] shadow-black/70">
                 {sugg.map((s, i) => (
                   <button
                     key={i}
@@ -324,7 +324,7 @@ export default function Header({
             {popover === "create" && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setPopover(null)} />
-                <div className="dropdown-in absolute end-0 top-12 z-50 w-56 rounded-xl bg-yt-raised border border-yt-border py-2 shadow-2xl shadow-black/60">
+                <div className="dropdown-in absolute end-0 top-12 z-50 w-56 rounded-xl bg-yt-raised border border-yt-border py-2 shadow-[0_4px_32px_rgba(0,0,0,0.5)] shadow-black/60">
                   {[
                     { icon: VideoIcon, label: t("uploadVideo") },
                     { icon: Radio, label: t("goLive") },
@@ -359,7 +359,7 @@ export default function Header({
             {popover === "bell" && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setPopover(null)} />
-                <div className="dropdown-in absolute end-0 top-12 z-50 w-[340px] max-w-[90vw] rounded-xl bg-yt-raised border border-yt-border shadow-2xl shadow-black/60 overflow-hidden">
+                <div className="dropdown-in absolute end-0 top-12 z-50 w-[340px] max-w-[90vw] rounded-xl bg-yt-raised border border-yt-border shadow-[0_4px_32px_rgba(0,0,0,0.5)] shadow-black/60 overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-yt-border">
                     <span className="font-bold text-[15px]">{t("notifications")}</span>
                     <button
@@ -493,7 +493,7 @@ export default function Header({
             {popover === "account" && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setPopover(null)} />
-                <div className="dropdown-in absolute end-0 top-12 z-50 w-72 rounded-xl bg-yt-raised border border-yt-border py-2 shadow-2xl shadow-black/70 overflow-hidden text-yt-text">
+                <div className="dropdown-in absolute end-0 top-12 z-50 w-72 rounded-xl bg-yt-raised border border-yt-border py-2 shadow-[0_4px_32px_rgba(0,0,0,0.5)] shadow-black/70 overflow-hidden text-yt-text">
                   <div className="flex items-center gap-3 px-4 py-3 border-b border-yt-border">
                     <div className="w-10 h-10 rounded-full grid place-items-center font-bold bg-yt-blue text-[#0f0f0f] shrink-0 overflow-hidden">
                       {user?.photoURL ? (
@@ -524,7 +524,7 @@ export default function Header({
                   </div>
 
                   {/* Cloud status banner */}
-                  <div className="px-4 py-2 bg-yt-surface/50 text-xs border-b border-yt-border flex items-center justify-between">
+                  <div className="px-4 py-2 bg-yt-surface text-xs border-b border-yt-border flex items-center justify-between">
                     <div className="flex items-center gap-2 text-yt-sub">
                       <Cloud className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                       <span>{t("firebaseCloud")}</span>
@@ -705,7 +705,7 @@ export default function Header({
       )}
 
       {listening && (
-        <div className="fixed inset-0 z-[70] bg-yt-bg/98 backdrop-blur flex flex-col items-center justify-center gap-6">
+        <div className="fixed inset-0 z-[70] bg-yt-bg/98 flex flex-col items-center justify-center gap-6">
           <span className="relative">
             <span className="absolute inset-0 rounded-full bg-yt-red/30 animate-ping" />
             <span className="relative w-20 h-20 rounded-full bg-yt-red grid place-items-center">
