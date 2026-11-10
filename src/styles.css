@@ -148,18 +148,35 @@
 /* ------------------------------------------------------------------ */
 
 @theme {
-  --font-sans: "Tajawal", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Cairo", ui-sans-serif, system-ui, sans-serif;
+  /*
+   * YouTube ships `"Roboto","Arial",sans-serif` on every surface. Arabic faces
+   * are appended as fallbacks so RTL text still renders in a proper Arabic
+   * typeface — Roboto simply has no Arabic glyphs to win those codepoints.
+   */
+  --font-sans: "Roboto", "Tajawal", Arial, sans-serif;
+  --font-display: "Roboto", "Tajawal", Arial, sans-serif;
 
+  /* Exact dark-theme palette from youtube.com */
   --color-yt-bg: #0f0f0f;
-  --color-yt-raised: #212121;
-  --color-yt-surface: #272727;
+  --color-yt-raised: #282828; /* menus, popups, dialogs */
+  --color-yt-surface: #272727; /* chips, action pills */
   --color-yt-hover: #3f3f3f;
   --color-yt-border: #303030;
   --color-yt-text: #f1f1f1;
   --color-yt-sub: #aaaaaa;
+  --color-yt-dim: #717171; /* guide footer, tertiary text */
+  --color-yt-search: #121212; /* search field background */
+  --color-yt-btn: #222222; /* search submit button */
   --color-yt-red: #ff0000;
   --color-yt-blue: #3ea6ff;
+
+  /* Layout metrics */
+  --yt-masthead-height: 56px;
+  --yt-guide-width: 240px;
+  --yt-mini-guide-width: 72px;
+  --yt-grid-item-min: 310px;
+  --yt-grid-gap-x: 16px;
+  --yt-grid-gap-y: 40px;
 }
 
 html,
@@ -167,6 +184,168 @@ body {
   background: var(--color-yt-bg);
   color: var(--color-yt-text);
   font-family: var(--font-sans);
+  /* YouTube renders body copy at 14px/20px; everything scales off that. */
+  font-size: 14px;
+  line-height: 20px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ------------------------------------------------------------------ */
+/* YouTube component metrics                                           */
+/* ------------------------------------------------------------------ */
+
+/*
+ * Rich grid. YouTube sizes columns off a minimum item width rather than
+ * breakpoint-counted columns, which is why its grid reflows smoothly instead
+ * of jumping 1 → 2 → 3. `auto-fill` reproduces that exactly.
+ */
+.yt-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--yt-grid-item-min), 1fr));
+  column-gap: var(--yt-grid-gap-x);
+  row-gap: var(--yt-grid-gap-y);
+}
+
+@media (max-width: 656px) {
+  .yt-grid {
+    --yt-grid-item-min: 100%;
+    --yt-grid-gap-y: 24px;
+  }
+}
+
+/* Two-line clamp used by every title on the site. */
+.yt-title {
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 500;
+  color: var(--color-yt-text);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.yt-meta {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--color-yt-sub);
+}
+
+/* Duration badge: bottom-right, 4px inset, 12px bold, 4px radius. */
+.yt-badge-time {
+  position: absolute;
+  inset-inline-end: 4px;
+  bottom: 4px;
+  z-index: 10;
+  padding: 3px 4px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 80%);
+  color: #fff;
+  font-size: 12px;
+  line-height: 12px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+/* Action pills on the watch page and chips in dialogs. */
+.yt-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 18px;
+  background: var(--color-yt-surface);
+  color: var(--color-yt-text);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color 0.1s ease;
+}
+.yt-pill:hover {
+  background: var(--color-yt-hover);
+}
+
+/* Filter chips above the feed: 32px tall, 8px radius, inverted when active. */
+.yt-chip {
+  flex: none;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  background: var(--color-yt-surface);
+  color: var(--color-yt-text);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color 0.1s ease;
+}
+.yt-chip:hover {
+  background: var(--color-yt-hover);
+}
+.yt-chip[data-selected="true"] {
+  background: var(--color-yt-text);
+  color: var(--color-yt-bg);
+}
+.yt-chip[data-selected="true"]:hover {
+  background: #fff;
+}
+
+/* Guide entries: 40px tall, 10px radius, 24px icon, 24px gap. */
+.yt-guide-item {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+  color: var(--color-yt-text);
+  text-align: start;
+  transition: background-color 0.1s ease;
+}
+.yt-guide-item:hover {
+  background: rgb(255 255 255 / 10%);
+}
+.yt-guide-item[data-active="true"] {
+  background: rgb(255 255 255 / 10%);
+  font-weight: 500;
+}
+
+/* Mini guide entries: 74px tall, stacked 10px label. */
+.yt-mini-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 64px;
+  padding: 16px 0 14px;
+  border-radius: 10px;
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--color-yt-text);
+  transition: background-color 0.1s ease;
+}
+.yt-mini-item:hover {
+  background: rgb(255 255 255 / 10%);
+}
+.yt-mini-item[data-active="true"] {
+  background: rgb(255 255 255 / 10%);
+  font-weight: 500;
+}
+
+.yt-divider {
+  border: 0;
+  border-top: 1px solid var(--color-yt-border);
+  margin: 12px 0;
 }
 
 * {
@@ -199,16 +378,19 @@ body {
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(14px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
+/*
+ * YouTube grid items do not slide or stagger in — they are simply there.
+ * Kept as a 120ms opacity fade so content does not pop during hydration,
+ * with no transform and no per-item delay.
+ */
 .rise {
-  opacity: 0;
-  animation: rise 0.55s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  animation: rise 0.12s linear;
+  animation-delay: 0s !important;
 }
 
 @keyframes pop {

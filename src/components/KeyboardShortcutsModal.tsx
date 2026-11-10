@@ -28,6 +28,11 @@ export default function KeyboardShortcutsModal({ open, onClose }: Props) {
     { keys: ["t"], descAr: "التبديل إلى وضع المسرح", descEn: "Toggle theater mode" },
     { keys: ["i"], descAr: "فتح المشغّل المصغّر", descEn: "Toggle miniplayer" },
     {
+      keys: ["s"],
+      descAr: "التقاط لقطة من اللحظة الحالية",
+      descEn: "Capture the current frame",
+    },
+    {
       keys: ["0", "-", "9"],
       descAr: "الانتقال إلى نسبة محددة (0% - 90%)",
       descEn: "Jump to percentage (0% - 90%)",

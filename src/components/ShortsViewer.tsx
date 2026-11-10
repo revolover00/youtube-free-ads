@@ -5,7 +5,7 @@ import {
   ThumbsDown,
   MessageCircle,
   Share2,
-  MoreVertical,
+  Maximize2,
   Music2,
   Volume2,
   VolumeX,
@@ -24,9 +24,11 @@ interface Props {
   startIndex: number;
   onClose: () => void;
   notify: (m: string) => void;
+  /** Open the current short in the full watch page. */
+  onOpenWatch?: (v: PipedVideo) => void;
 }
 
-export default function ShortsViewer({ items, startIndex, onClose, notify }: Props) {
+export default function ShortsViewer({ items, startIndex, onClose, notify, onOpenWatch }: Props) {
   const { t } = useLanguage();
   const [active, setActive] = useState(startIndex);
   const [likes, setLikes] = useState<Record<string, boolean>>({});
@@ -98,6 +100,7 @@ export default function ShortsViewer({ items, startIndex, onClose, notify }: Pro
               setLikes((p) => ({ ...p, [id]: !p[id] }));
             }}
             notify={notify}
+            onOpenWatch={onOpenWatch}
           />
         ))}
       </div>
@@ -121,6 +124,7 @@ function ShortItem({
   liked,
   onLike,
   notify,
+  onOpenWatch,
 }: {
   video: PipedVideo;
   active: boolean;
@@ -128,6 +132,7 @@ function ShortItem({
   liked: boolean;
   onLike: () => void;
   notify: (m: string) => void;
+  onOpenWatch?: (v: PipedVideo) => void;
 }) {
   const { t, lang } = useLanguage();
   const id = videoIdFromUrl(video.url);
@@ -212,11 +217,13 @@ function ShortItem({
             onClick={() => notify(t("linkCopied"))}
             label={t("share")}
           />
-          <RailBtn
-            icon={<MoreVertical className="w-6 h-6" />}
-            onClick={() => {}}
-            label={t("more")}
-          />
+          {onOpenWatch && (
+            <RailBtn
+              icon={<Maximize2 className="w-6 h-6" />}
+              onClick={() => onOpenWatch(video)}
+              label={t("watchFullVideo")}
+            />
+          )}
         </div>
       </div>
     </div>

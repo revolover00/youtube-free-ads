@@ -1,20 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import type { ChannelData, PipedVideo, PlaylistData, StreamData } from "./types";
+import type { ChannelData, PipedVideo, PlaylistData, StoryboardFrame, StreamData } from "./types";
 import type { Page, TrendingPage } from "./youtube.server";
 
 const queryInput = (data: unknown) => z.object({ q: z.string().min(1) }).parse(data);
 
 export const searchVideosFn = createServerFn({ method: "POST" })
-  .inputValidator(queryInput)
+  .validator(queryInput)
   .handler(async ({ data }): Promise<PipedVideo[]> => {
     const { search } = await import("./youtube.server");
     return search(data.q);
   });
 
 export const searchPageFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     z.object({ q: z.string().min(1), continuation: z.string().nullable().optional() }).parse(data),
   )
   .handler(async ({ data }): Promise<Page> => {
@@ -23,7 +23,7 @@ export const searchPageFn = createServerFn({ method: "POST" })
   });
 
 export const suggestionsFn = createServerFn({ method: "POST" })
-  .inputValidator(queryInput)
+  .validator(queryInput)
   .handler(async ({ data }): Promise<string[]> => {
     const { suggest } = await import("./youtube.server");
     return suggest(data.q);
@@ -37,7 +37,7 @@ export const trendingFn = createServerFn({ method: "POST" }).handler(
 );
 
 export const trendingPageFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     z.object({ cursors: z.array(z.string().nullable()).optional() }).parse(data ?? {}),
   )
   .handler(async ({ data }): Promise<TrendingPage> => {
@@ -46,42 +46,51 @@ export const trendingPageFn = createServerFn({ method: "POST" })
   });
 
 export const videoDetailsFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ id: z.string().min(6) }).parse(data))
+  .validator((data: unknown) => z.object({ id: z.string().min(6) }).parse(data))
   .handler(async ({ data }): Promise<StreamData> => {
     const { videoDetails } = await import("./youtube.server");
     return videoDetails(data.id);
   });
 
+export const videoFrameFn = createServerFn({ method: "POST" })
+  .validator((data: unknown) =>
+    z.object({ id: z.string().min(6), time: z.number().min(0).default(0) }).parse(data),
+  )
+  .handler(async ({ data }): Promise<StoryboardFrame> => {
+    const { videoFrame } = await import("./youtube.server");
+    return videoFrame(data.id, data.time);
+  });
+
 export const playlistFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ id: z.string().min(2) }).parse(data))
+  .validator((data: unknown) => z.object({ id: z.string().min(2) }).parse(data))
   .handler(async ({ data }): Promise<PlaylistData> => {
     const { playlist } = await import("./youtube.server");
     return playlist(data.id);
   });
 
 export const channelFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .validator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
   .handler(async ({ data }): Promise<ChannelData> => {
     const { channel } = await import("./youtube.server");
     return channel(data.id);
   });
 
 export const channelFeedFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .validator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
   .handler(async ({ data }): Promise<PipedVideo[]> => {
     const { channelFeed } = await import("./youtube.server");
     return channelFeed(data.id);
   });
 
 export const browsePageFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ continuation: z.string().min(1) }).parse(data))
+  .validator((data: unknown) => z.object({ continuation: z.string().min(1) }).parse(data))
   .handler(async ({ data }): Promise<Page> => {
     const { browsePage } = await import("./youtube.server");
     return browsePage(data.continuation);
   });
 
 export const commentsPageFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ token: z.string().min(1) }).parse(data))
+  .validator((data: unknown) => z.object({ token: z.string().min(1) }).parse(data))
   .handler(
     async ({
       data,
@@ -92,7 +101,7 @@ export const commentsPageFn = createServerFn({ method: "POST" })
   );
 
 export const homeCandidatesFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     z
       .object({
         channelIds: z.array(z.string()),
@@ -110,7 +119,7 @@ export const homeCandidatesFn = createServerFn({ method: "POST" })
       relatedIds: string[];
       interest: PipedVideo[];
       trending: PipedVideo[];
-      trendingNext: unknown;
+      trendingNext: (string | null)[] | null;
       stats: {
         sub: { ok: number; fail: number };
         related: { ok: number; fail: number };
@@ -183,7 +192,7 @@ export const homeCandidatesFn = createServerFn({ method: "POST" })
       const relatedIdsSet = new Set<string>();
       const interest: PipedVideo[] = [];
       let trending: PipedVideo[] = [];
-      let trendingNext: unknown = null;
+      let trendingNext: (string | null)[] | null = null;
 
       const stats = {
         sub: { ok: 0, fail: 0 },

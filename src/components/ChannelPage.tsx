@@ -208,7 +208,7 @@ export default function ChannelPage({
           <div className="flex items-center gap-2 mt-4 justify-center sm:justify-start">
             <button
               onClick={() => onToggleSub({ channelId, name: data.name, avatar: data.avatarUrl })}
-              className={`h-9 px-4 rounded-full text-sm font-bold transition-all active:scale-95 flex items-center gap-2 ${
+              className={`h-9 px-4 rounded-full text-sm font-bold transition-all flex items-center gap-2 ${
                 isSubscribed
                   ? "bg-yt-surface text-yt-text"
                   : "bg-yt-text text-yt-bg hover:bg-white/80"
@@ -312,7 +312,7 @@ export default function ChannelPage({
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-x-4 gap-y-8">
+            <div className="yt-grid">
               {videos.map((v, i) => (
                 <VideoCard key={videoIdFromUrl(v.url)} {...cardProps(v, i)} />
               ))}
@@ -321,7 +321,7 @@ export default function ChannelPage({
         )}
 
         {tabId === "videos" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-x-4 gap-y-8">
+          <div className="yt-grid">
             {videos.map((v, i) => (
               <VideoCard key={videoIdFromUrl(v.url)} {...cardProps(v, i)} />
             ))}

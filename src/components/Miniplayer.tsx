@@ -195,7 +195,7 @@ export default function Miniplayer({ video, onExpand, onClose }: Props) {
               e.stopPropagation();
               onExpand();
             }}
-            className="w-8 h-8 rounded-full bg-black/80 hover:bg-black text-white grid place-items-center shadow-md transition-transform hover:scale-105 active:scale-95"
+            className="w-8 h-8 rounded-full bg-black/80 hover:bg-black text-white grid place-items-center shadow-md transition-transform"
             title={t("expand")}
             aria-label={t("expand")}
           >
@@ -206,7 +206,7 @@ export default function Miniplayer({ video, onExpand, onClose }: Props) {
               e.stopPropagation();
               onClose();
             }}
-            className="w-8 h-8 rounded-full bg-black/80 hover:bg-black text-white grid place-items-center shadow-md transition-transform hover:scale-105 active:scale-95"
+            className="w-8 h-8 rounded-full bg-black/80 hover:bg-black text-white grid place-items-center shadow-md transition-transform"
             title={t("closeMiniplayer")}
             aria-label={t("closeMiniplayer")}
           >

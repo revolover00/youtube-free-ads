@@ -14,6 +14,55 @@ import { auth, db, handleFirestoreError, OperationType } from "./firebase";
 import type { HistoryRow, Subscription, VideoMeta, UserPlaylist, AppNotification } from "./types";
 
 /* ------------------------------------------------------------------ */
+/* Firestore document shapes                                           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Every field this app ever reads off a Firestore document, all optional.
+ *
+ * `DocumentSnapshot.data()` is typed as a bare index signature, which under
+ * `noPropertyAccessFromIndexSignature` forces `data["field"]` everywhere and
+ * silently accepts typos. Declaring the shape once gives us dot access back
+ * *and* makes a misspelled field a compile error.
+ */
+export interface StoredDoc {
+  // notifications
+  video_id?: string;
+  channel_id?: string;
+  channel_name?: string;
+  channel_avatar?: string;
+  created_at?: string;
+  read?: boolean;
+  // shared
+  title?: string;
+  thumbnail?: string;
+  description?: string;
+  duration?: number;
+  progress?: number;
+  category?: string;
+  // subscriptions
+  channelId?: string;
+  channelTitle?: string;
+  avatar?: string;
+  subscriberCount?: number | string;
+  addedAt?: string;
+  // history
+  videoId?: string;
+  watchedAt?: string;
+  // playlists
+  videoIds?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+  // dismissed
+  channelIds?: string[];
+}
+
+/** Read a Firestore snapshot as a {@link StoredDoc}. */
+function docData(snap: { data(): unknown }): StoredDoc {
+  return (snap.data() ?? {}) as StoredDoc;
+}
+
+/* ------------------------------------------------------------------ */
 /* Notifications: Firestore + Local Cache                             */
 /* ------------------------------------------------------------------ */
 
@@ -30,16 +79,16 @@ export async function getNotifications(): Promise<AppNotification[]> {
     const snap = await getDocs(q);
     const remote: AppNotification[] = [];
     snap.forEach((d) => {
-      const data = d.data();
+      const data = docData(d);
       remote.push({
         id: d.id,
-        video_id: data.video_id,
-        title: data.title,
-        thumbnail: data.thumbnail,
-        channel_id: data.channel_id,
-        channel_name: data.channel_name,
-        channel_avatar: data.channel_avatar,
-        created_at: data.created_at,
+        video_id: data.video_id ?? d.id,
+        title: data.title ?? "",
+        thumbnail: data.thumbnail ?? "",
+        channel_id: data.channel_id ?? "",
+        channel_name: data.channel_name ?? "",
+        channel_avatar: data.channel_avatar ?? "",
+        created_at: data.created_at ?? new Date(0).toISOString(),
         read: data.read || false,
       });
     });
@@ -236,7 +285,7 @@ export async function fetchUserProgress(): Promise<Record<string, number>> {
     const snap = await getDocs(collection(db, "users", currentUser.uid, "history"));
     const remote: Record<string, number> = {};
     snap.forEach((d) => {
-      const data = d.data();
+      const data = docData(d);
       if (typeof data.progress === "number") {
         remote[d.id] = data.progress;
       }
@@ -304,7 +353,7 @@ export async function getSubscriptions(): Promise<Subscription[]> {
     const snap = await getDocs(collection(db, "users", currentUser.uid, "subscriptions"));
     const remote: Subscription[] = [];
     snap.forEach((d) => {
-      const data = d.data();
+      const data = docData(d);
       remote.push({
         channel_id: data.channelId || d.id,
         channel_name: data.channelTitle || "",
@@ -424,7 +473,7 @@ export async function getHistory(): Promise<HistoryRow[]> {
     const snap = await getDocs(collection(db, "users", currentUser.uid, "history"));
     const remote: HistoryRow[] = [];
     snap.forEach((d) => {
-      const data = d.data();
+      const data = docData(d);
       remote.push({
         video_id: data.videoId || d.id,
         title: data.title || "",
@@ -434,7 +483,7 @@ export async function getHistory(): Promise<HistoryRow[]> {
         progress: data.progress || 0,
         thumbnail: data.thumbnail,
         duration: data.duration,
-        watched_at: data.watchedAt,
+        watched_at: data.watchedAt ?? new Date(0).toISOString(),
       });
     });
 
@@ -600,15 +649,15 @@ export async function getCustomPlaylists(): Promise<UserPlaylist[]> {
     const snap = await getDocs(q);
     const remote: UserPlaylist[] = [];
     snap.forEach((d) => {
-      const data = d.data();
+      const data = docData(d);
       remote.push({
         id: d.id,
         title: data.title || "Untitled Playlist",
         description: data.description || "",
         videoIds: data.videoIds || [],
         thumbnail: data.thumbnail || "",
-        createdAt: data.createdAt,
-        updatedAt: data.updatedAt,
+        createdAt: data.createdAt ?? new Date().toISOString(),
+        updatedAt: data.updatedAt ?? data.createdAt ?? new Date().toISOString(),
       });
     });
 
@@ -816,7 +865,7 @@ export async function fetchDismissed(): Promise<{ videoIds: string[]; channelIds
     const docRef = doc(db, "users", currentUser.uid, "prefs", "dismissed");
     const snap = await getDoc(docRef);
     if (snap.exists()) {
-      const data = snap.data();
+      const data = docData(snap);
       const remote = {
         videoIds: Array.isArray(data.videoIds) ? data.videoIds : [],
         channelIds: Array.isArray(data.channelIds) ? data.channelIds : [],

@@ -918,9 +918,17 @@ export async function videoDetails(videoId: string): Promise<StreamData> {
         }
       }) || allTokens[0];
 
-    const commentsData = commentToken
-      ? await fetchComments(commentToken, 30)
-      : { items: [], totalCount: 0 };
+    const [commentsData, meta] = await Promise.all([
+      commentToken
+        ? fetchComments(commentToken, 30)
+        : Promise.resolve({
+            items: [] as PipedComment[],
+            totalCount: 0,
+            nextContinuation: undefined as string | undefined,
+          }),
+      // Duration + storyboard spec. Never allowed to fail the watch page.
+      playerMeta(videoId).catch(() => ({ duration: 0, storyboardSpec: "" })),
+    ]);
 
     const category =
       text(collect(next, "playerMicroformatRenderer")[0]?.category) ||
@@ -933,6 +941,7 @@ export async function videoDetails(videoId: string): Promise<StreamData> {
         text(collect(secondary, "attributedDescription")[0]) || text(secondary.description),
       uploadDate,
       relativeDate,
+      duration: meta.duration,
       category,
       likes,
       views: parseCount(text(collect(primary, "videoViewCountRenderer")[0]?.viewCount)),
@@ -1191,4 +1200,154 @@ export async function browsePage(continuation: string): Promise<Page> {
     channels: [],
     playlists: [],
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Frame capture (storyboards)                                         */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Playback runs inside a cross-origin `youtube.com/embed` iframe, so the
+ * browser can never read its pixels. YouTube does, however, publish the
+ * decoded frames it uses for scrub previews as public sprite sheets on
+ * `i.ytimg.com`. Those are real frames of the real video, addressable by
+ * timestamp — which is exactly what an in-page "screenshot" needs.
+ *
+ * Spec format (`playerStoryboardSpecRenderer.spec`):
+ *
+ *   <baseUrl with $L/$N placeholders>|<level 0>|<level 1>|…
+ *   level := width#height#frameCount#cols#rows#interval#nameReplacement#sigh
+ *
+ * Levels are listed low → high quality; the last one is the biggest.
+ */
+export interface StoryboardLevel {
+  url: string;
+  width: number;
+  height: number;
+  frameCount: number;
+  cols: number;
+  rows: number;
+}
+
+export function parseStoryboardSpec(spec: string): StoryboardLevel[] {
+  if (!spec) return [];
+  const parts = spec.split("|");
+  const base = parts.shift();
+  if (!base) return [];
+
+  const levels: StoryboardLevel[] = [];
+  parts.forEach((raw, i) => {
+    const args = raw.split("#");
+    if (args.length < 8) return;
+    const [width, height, frameCount, cols, rows] = args.slice(0, 5).map(Number);
+    const nameReplacement = args[6];
+    const sigh = args[7];
+    if (!width || !height || !frameCount || !cols || !rows) return;
+
+    let url = base.replace("$L", String(i)).replace("$N", nameReplacement ?? "M$M");
+    url += `${url.includes("?") ? "&" : "?"}sigh=${sigh}`;
+    levels.push({ url, width, height, frameCount, cols, rows });
+  });
+  return levels;
+}
+
+/** `lengthSeconds` + storyboard spec, straight from the `player` endpoint. */
+export async function playerMeta(
+  videoId: string,
+): Promise<{ duration: number; storyboardSpec: string }> {
+  return cached(`playerMeta:${videoId}`, 6 * 60 * 60 * 1000, async () => {
+    const res = await innertube("player", { videoId });
+    const duration = Number(res?.videoDetails?.lengthSeconds ?? 0) || 0;
+    const storyboardSpec: string =
+      res?.storyboards?.playerStoryboardSpecRenderer?.spec ??
+      collect(res, "playerStoryboardSpecRenderer")[0]?.spec ??
+      "";
+    return { duration, storyboardSpec };
+  });
+}
+
+async function fetchAsDataUrl(url: string): Promise<{ dataUrl: string; bytes: number }> {
+  const res = await fetch(url, {
+    headers: {
+      "user-agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      referer: "https://www.youtube.com/",
+    },
+  });
+  if (!res.ok) throw new Error(`frame fetch → HTTP ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const type = res.headers.get("content-type") || "image/jpeg";
+  return { dataUrl: `data:${type};base64,${buf.toString("base64")}`, bytes: buf.byteLength };
+}
+
+export interface FrameResult {
+  /** base64 data URL — same-origin by construction, so canvas stays untainted. */
+  sheet: string;
+  /** Geometry of the requested frame inside `sheet`. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Timestamp the returned frame actually represents. */
+  at: number;
+  source: "storyboard" | "poster";
+}
+
+/**
+ * Resolve the frame shown at `time` seconds, returned inline as base64 so the
+ * browser never performs a cross-origin image read.
+ *
+ * Degrades to the video poster when a video has no storyboard (very short
+ * clips, some live streams); callers must surface which one they got.
+ */
+export async function videoFrame(videoId: string, time: number): Promise<FrameResult> {
+  const at = Math.max(0, Number.isFinite(time) ? time : 0);
+
+  try {
+    const { duration, storyboardSpec } = await playerMeta(videoId);
+    const levels = parseStoryboardSpec(storyboardSpec);
+    const level = levels.at(-1);
+
+    if (level && duration > 0) {
+      const perSheet = level.cols * level.rows;
+      const frameIndex = Math.min(
+        level.frameCount - 1,
+        Math.max(0, Math.floor((at / duration) * level.frameCount)),
+      );
+      const sheetIndex = Math.floor(frameIndex / perSheet);
+      const withinSheet = frameIndex % perSheet;
+
+      const url = level.url.replace("$M", String(sheetIndex));
+      const { dataUrl } = await fetchAsDataUrl(url);
+
+      return {
+        sheet: dataUrl,
+        x: (withinSheet % level.cols) * level.width,
+        y: Math.floor(withinSheet / level.cols) * level.height,
+        width: level.width,
+        height: level.height,
+        at: (frameIndex / level.frameCount) * duration,
+        source: "storyboard",
+      };
+    }
+  } catch {
+    // fall through to the poster
+  }
+
+  for (const name of ["maxresdefault", "sddefault", "hqdefault"]) {
+    try {
+      const { dataUrl } = await fetchAsDataUrl(`https://i.ytimg.com/vi/${videoId}/${name}.jpg`);
+      const size =
+        name === "maxresdefault"
+          ? { width: 1280, height: 720 }
+          : name === "sddefault"
+            ? { width: 640, height: 480 }
+            : { width: 480, height: 360 };
+      return { sheet: dataUrl, x: 0, y: 0, ...size, at, source: "poster" };
+    } catch {
+      // try the next size down
+    }
+  }
+
+  throw new Error("no frame source available for this video");
 }

@@ -5,7 +5,7 @@
  */
 
 export const GOOGLE_CLIENT_ID =
-  (typeof import.meta !== "undefined" && import.meta.env?.VITE_GOOGLE_CLIENT_ID) ||
+  (typeof import.meta !== "undefined" && import.meta.env?.["VITE_GOOGLE_CLIENT_ID"]) ||
   "880349982881-8naia73nime31f07q99j6e2m55gimlac.apps.googleusercontent.com";
 
 export const YOUTUBE_SCOPES = [

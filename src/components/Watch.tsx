@@ -18,8 +18,11 @@ import {
   Play,
   Square,
   Keyboard,
+  Camera,
+  Check,
 } from "lucide-react";
 import KeyboardShortcutsModal from "./KeyboardShortcutsModal";
+import ScreenshotDialog from "./ScreenshotDialog";
 import { getCommentsPage, getStreams, searchPaged } from "../lib/api";
 import { appStore, useAppStore } from "../lib/appStore";
 import {
@@ -322,6 +325,11 @@ export default function Watch({
   const [isMuted, setIsMuted] = useState(false);
   const [videoDuration, setVideoDuration] = useState(video.duration || 0);
   const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+  const [screenshot, setScreenshot] = useState<{ at: number } | null>(null);
+
+  // Overflow ("More actions") menu in the watch action row
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
 
   // Comments state & pagination
   const [commentsList, setCommentsList] = useState<PipedComment[]>([]);
@@ -563,6 +571,23 @@ export default function Watch({
     return () => window.removeEventListener("yt:player-info", handlePlayerInfo);
   }, []);
 
+  // Dismiss the overflow menu on outside click or Escape
+  useEffect(() => {
+    if (!moreOpen) return undefined;
+    const onPointerDown = (e: PointerEvent) => {
+      if (!moreMenuRef.current?.contains(e.target as Node)) setMoreOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMoreOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [moreOpen]);
+
   // Keyboard Shortcuts Handler (YouTube style)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -615,6 +640,13 @@ export default function Watch({
           "*",
         );
         setIsCurrentlyPlaying((prev) => !prev);
+        return;
+      }
+
+      // 's' / 'S' -> Capture the frame currently on screen
+      if (key === "s" || key === "S") {
+        e.preventDefault();
+        setScreenshot({ at: currentTime });
         return;
       }
 
@@ -785,7 +817,7 @@ export default function Watch({
 
   if (error) {
     return (
-      <div className="max-w-[1720px] mx-auto px-3 sm:px-6 pt-6">
+      <div className="max-w-[1754px] mx-auto px-3 sm:px-6 pt-6">
         <ErrorState onRetry={() => void refetch()} message={t("watchError")} />
       </div>
     );
@@ -793,7 +825,7 @@ export default function Watch({
 
   if (!data) {
     return (
-      <div className="max-w-[1720px] mx-auto px-3 sm:px-6 pt-4 lg:pt-6 flex flex-col lg:flex-row gap-6">
+      <div className="max-w-[1754px] mx-auto px-3 sm:px-6 pt-4 lg:pt-6 flex flex-col lg:flex-row gap-6">
         <div className="flex-1 min-w-0">
           <div className="relative aspect-video rounded-none lg:rounded-xl overflow-hidden bg-black group">
             <div id="watch-player-slot" className="w-full h-full" />
@@ -816,13 +848,23 @@ export default function Watch({
 
   return (
     <div
-      className={`max-w-[1720px] mx-auto px-3 sm:px-6 pt-4 lg:pt-6 flex flex-col gap-6 ${
+      className={`max-w-[1754px] mx-auto px-3 sm:px-6 pt-4 lg:pt-6 flex flex-col lg:gap-6 ${
         theater ? "lg:max-w-none lg:px-4" : "lg:flex-row"
       }`}
     >
       <KeyboardShortcutsModal
         open={showShortcutsModal}
         onClose={() => setShowShortcutsModal(false)}
+      />
+
+      <ScreenshotDialog
+        open={!!screenshot}
+        onClose={() => setScreenshot(null)}
+        videoId={id}
+        time={screenshot?.at ?? currentTime}
+        title={data?.title || video.title}
+        channel={data?.uploader || video.uploaderName}
+        notify={notify}
       />
 
       <div className={`flex-1 min-w-0 ${theater ? "lg:px-0" : ""}`}>
@@ -837,28 +879,22 @@ export default function Watch({
         </div>
 
         {/* Video Title & Actions */}
-        <h1 className="font-display font-bold text-lg sm:text-xl mt-3 leading-snug">
-          {data.title}
-        </h1>
+        <h1 className="mt-3 text-[20px] leading-[28px] font-bold text-yt-text">{data.title}</h1>
 
         <div className="flex flex-wrap items-center gap-3 mt-3">
           <div className="flex items-center gap-3 me-auto">
-            <button
-              onClick={() => onChannel(channelId, data.uploader)}
-              className="transition-transform hover:scale-105"
-              aria-label={data.uploader}
-            >
+            <button onClick={() => onChannel(channelId, data.uploader)} aria-label={data.uploader}>
               <Avatar src={data.uploaderAvatar} name={data.uploader} size="w-10 h-10 text-base" />
             </button>
             <button
               onClick={() => onChannel(channelId, data.uploader)}
               className="leading-tight text-start"
             >
-              <div className="flex items-center gap-1 font-bold text-[15px]">
+              <div className="flex items-center gap-1 text-[16px] leading-[22px] font-medium text-yt-text">
                 {data.uploader}
                 {data.uploaderVerified && <BadgeCheck className="w-4 h-4 text-yt-sub" />}
               </div>
-              <div className="text-xs text-yt-sub">
+              <div className="text-[12px] leading-[18px] text-yt-sub">
                 {fmtViews(data.uploaderSubscriberCount, lang)} {t("subscribers")}
               </div>
             </button>
@@ -866,10 +902,10 @@ export default function Watch({
               onClick={() =>
                 onToggleSub({ channelId, name: data.uploader, avatar: data.uploaderAvatar })
               }
-              className={`ms-2 h-9 px-4 rounded-full text-sm font-bold transition-all active:scale-95 ${
+              className={`ms-2 h-9 px-4 rounded-full text-sm font-medium transition-colors ${
                 isSubscribed(channelId)
-                  ? "bg-yt-surface text-yt-text"
-                  : "bg-yt-text text-yt-bg hover:bg-white/80"
+                  ? "bg-yt-surface text-yt-text hover:bg-yt-hover"
+                  : "bg-yt-text text-yt-bg hover:bg-white"
               }`}
             >
               {isSubscribed(channelId) ? t("subscribed") : t("subscribe")}
@@ -883,7 +919,7 @@ export default function Watch({
                   onToggleLike();
                   setDisliked(false);
                 }}
-                className={`flex items-center gap-2 h-9 ps-4 pe-3 text-sm font-medium hover:bg-yt-hover transition-colors ${
+                className={`flex items-center gap-1.5 h-9 ps-4 pe-3 text-sm font-medium hover:bg-yt-hover transition-colors ${
                   liked ? "text-yt-blue" : ""
                 }`}
               >
@@ -904,7 +940,7 @@ export default function Watch({
                   setDisliked((d) => !d);
                   if (liked) onToggleLike();
                 }}
-                className={`h-9 px-3.5 hover:bg-yt-hover transition-colors ${
+                className={`h-9 px-4 hover:bg-yt-hover transition-colors ${
                   disliked ? "text-yt-blue" : ""
                 }`}
                 aria-label={t("dislike")}
@@ -912,51 +948,86 @@ export default function Watch({
                 <ThumbsDown className={`w-5 h-5 ${disliked ? "fill-current pop" : ""}`} />
               </button>
             </div>
-            <button
-              onClick={() => notify(t("linkCopied"))}
-              className="flex items-center gap-2 h-9 px-3.5 rounded-full bg-yt-surface hover:bg-yt-hover text-sm font-medium"
-            >
-              <Share2 className="w-5 h-5" /> {t("share")}
+            <button onClick={() => notify(t("linkCopied"))} className="yt-pill cursor-pointer">
+              <Share2 className="w-6 h-6" /> {t("share")}
             </button>
-            <button
-              onClick={() => onAddToPlaylist(video)}
-              className="flex items-center gap-2 h-9 px-3.5 rounded-full bg-yt-surface hover:bg-yt-hover text-sm font-medium"
-            >
-              <ListVideo className="w-5 h-5" />
+            <button onClick={() => onAddToPlaylist(video)} className="yt-pill cursor-pointer">
+              <ListVideo className="w-6 h-6" />
               <span className="hidden sm:inline">{t("save")}</span>
             </button>
             <button
               type="button"
-              onClick={toggleTheater}
-              className={`flex items-center gap-2 h-9 px-3.5 rounded-full text-sm font-medium transition-colors ${
-                theater
-                  ? "bg-yt-blue text-black font-bold shadow-xs"
-                  : "bg-yt-surface hover:bg-yt-hover text-yt-text"
-              }`}
-              title={isAr ? "وضع المسرح (t)" : "Theater mode (t)"}
+              onClick={() => setScreenshot({ at: currentTime })}
+              className="yt-pill cursor-pointer"
+              title={isAr ? "لقطة من الفيديو (s)" : "Screenshot this frame (s)"}
             >
-              <Square className="w-5 h-5" />
-              <span className="hidden sm:inline">{isAr ? "وضع المسرح" : "Theater"}</span>
+              <Camera className="w-6 h-6" />
+              <span className="hidden sm:inline">{t("screenshot")}</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setShowShortcutsModal(true)}
-              className="flex items-center gap-2 h-9 px-3.5 rounded-full bg-yt-surface hover:bg-yt-hover text-sm font-medium text-yt-text transition-colors"
-              title={isAr ? "اختصارات لوحة المفاتيح (?)" : "Keyboard shortcuts (?)"}
-            >
-              <Keyboard className="w-5 h-5" />
-              <span className="hidden sm:inline">{isAr ? "الاختصارات" : "Shortcuts"}</span>
-            </button>
-            {onMinimize && (
+
+            {/*
+              YouTube keeps only Like / Share / Save (+ Download) inline and files
+              everything else under a 36px circular overflow button. Theater,
+              shortcuts and miniplayer live there instead of in the pill row.
+            */}
+            <div className="relative" ref={moreMenuRef}>
               <button
-                onClick={onMinimize}
-                className="flex items-center gap-2 h-9 px-3.5 rounded-full bg-yt-surface hover:bg-yt-hover text-sm font-medium"
-                title={isAr ? "تصغير الفيديو (i)" : "Miniplayer (i)"}
+                type="button"
+                onClick={() => setMoreOpen((o) => !o)}
+                className="w-9 h-9 grid place-items-center rounded-full bg-yt-surface hover:bg-yt-hover cursor-pointer"
+                aria-label={isAr ? "المزيد من الإجراءات" : "More actions"}
+                aria-haspopup="menu"
+                aria-expanded={moreOpen}
               >
-                <PictureInPicture2 className="w-5 h-5" />
-                <span className="hidden sm:inline">{isAr ? "تصغير" : "Miniplayer"}</span>
+                <MoreHorizontal className="w-5 h-5" />
               </button>
-            )}
+              {moreOpen && (
+                <div
+                  role="menu"
+                  className="absolute end-0 top-11 z-50 min-w-[200px] rounded-xl bg-yt-raised py-2 shadow-[0_4px_32px_rgba(0,0,0,0.5)]"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMoreOpen(false);
+                      toggleTheater();
+                    }}
+                    className="flex w-full items-center gap-4 px-4 py-2.5 text-start text-sm hover:bg-yt-hover cursor-pointer"
+                  >
+                    <Square className="w-6 h-6 shrink-0" />
+                    <span>{isAr ? "وضع المسرح" : "Theater mode"}</span>
+                    {theater && <Check className="w-4 h-4 ms-auto text-yt-sub" />}
+                  </button>
+                  {onMinimize && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setMoreOpen(false);
+                        onMinimize();
+                      }}
+                      className="flex w-full items-center gap-4 px-4 py-2.5 text-start text-sm hover:bg-yt-hover cursor-pointer"
+                    >
+                      <PictureInPicture2 className="w-6 h-6 shrink-0" />
+                      <span>{isAr ? "المشغّل المصغّر" : "Miniplayer"}</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMoreOpen(false);
+                      setShowShortcutsModal(true);
+                    }}
+                    className="flex w-full items-center gap-4 px-4 py-2.5 text-start text-sm hover:bg-yt-hover cursor-pointer"
+                  >
+                    <Keyboard className="w-6 h-6 shrink-0" />
+                    <span>{isAr ? "اختصارات لوحة المفاتيح" : "Keyboard shortcuts"}</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1070,7 +1141,7 @@ export default function Watch({
         <div className="lg:hidden mt-3">
           <div
             onClick={() => setMobileCommentsOpen(true)}
-            className="p-3 sm:p-4 rounded-xl bg-yt-surface/90 hover:bg-yt-surface border border-yt-border/40 transition-all cursor-pointer active:scale-[0.99] select-none shadow-xs"
+            className="p-3 sm:p-4 rounded-xl bg-yt-surface/90 hover:bg-yt-surface border border-yt-border/40 transition-all cursor-pointer select-none shadow-xs"
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -1140,7 +1211,7 @@ export default function Watch({
           {showInlineComments && (
             <div className="mt-3 p-3.5 sm:p-4 rounded-xl bg-yt-raised border border-yt-border/40 space-y-4 animate-in fade-in duration-200">
               <div className="flex gap-2.5 items-center">
-                <span className="w-8 h-8 rounded-full grid place-items-center text-xs font-bold bg-gradient-to-br from-yt-blue to-teal-400 text-black shrink-0">
+                <span className="w-8 h-8 rounded-full grid place-items-center text-xs font-bold bg-yt-blue text-[#0f0f0f] shrink-0">
                   {isAr ? "أ" : "U"}
                 </span>
                 <input
@@ -1168,7 +1239,7 @@ export default function Watch({
                     <button
                       onClick={loadMoreComments}
                       disabled={loadingComments}
-                      className="px-6 py-2 rounded-full bg-yt-surface hover:bg-yt-hover text-sm font-medium transition-all active:scale-95 inline-flex items-center gap-2"
+                      className="px-6 py-2 rounded-full bg-yt-surface hover:bg-yt-hover text-sm font-medium transition-all inline-flex items-center gap-2"
                     >
                       {loadingComments ? (
                         <>
@@ -1197,7 +1268,7 @@ export default function Watch({
           </div>
 
           <div className="flex gap-3 mt-4">
-            <span className="w-10 h-10 rounded-full grid place-items-center text-sm font-bold bg-gradient-to-br from-yt-blue to-teal-400 text-black shrink-0">
+            <span className="w-10 h-10 rounded-full grid place-items-center text-sm font-bold bg-yt-blue text-[#0f0f0f] shrink-0">
               {isAr ? "أ" : "U"}
             </span>
             <input
@@ -1224,7 +1295,7 @@ export default function Watch({
                 <button
                   onClick={loadMoreComments}
                   disabled={loadingComments}
-                  className="px-6 py-2 rounded-full bg-yt-surface hover:bg-yt-hover text-sm font-medium transition-all active:scale-95 inline-flex items-center gap-2"
+                  className="px-6 py-2 rounded-full bg-yt-surface hover:bg-yt-hover text-sm font-medium transition-all inline-flex items-center gap-2"
                 >
                   {loadingComments ? (
                     <>
@@ -1242,7 +1313,7 @@ export default function Watch({
       </div>
 
       {/* Related / Suggested Videos Column (Infinite Scrolling) */}
-      <aside className={`shrink-0 ${theater ? "w-full" : "lg:w-[400px] xl:w-[420px]"}`}>
+      <aside className={`shrink-0 ${theater ? "w-full" : "lg:w-[402px]"}`}>
         <QueuePanel onOpen={onOpen} />
 
         <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar">
@@ -1320,7 +1391,7 @@ export default function Watch({
               </div>
               <button
                 onClick={() => setMobileCommentsOpen(false)}
-                className="w-8 h-8 rounded-full hover:bg-yt-hover grid place-items-center text-yt-text transition-colors active:scale-95"
+                className="w-8 h-8 rounded-full hover:bg-yt-hover grid place-items-center text-yt-text transition-colors"
                 aria-label={t("close")}
               >
                 <X className="w-5 h-5" />
@@ -1329,7 +1400,7 @@ export default function Watch({
 
             {/* Write comment input */}
             <div className="px-4 py-3 border-b border-yt-border/30 shrink-0 flex gap-3 items-center">
-              <span className="w-8 h-8 rounded-full grid place-items-center text-xs font-bold bg-gradient-to-br from-yt-blue to-teal-400 text-black shrink-0">
+              <span className="w-8 h-8 rounded-full grid place-items-center text-xs font-bold bg-yt-blue text-[#0f0f0f] shrink-0">
                 {isAr ? "أ" : "U"}
               </span>
               <input
@@ -1358,7 +1429,7 @@ export default function Watch({
                   <button
                     onClick={loadMoreComments}
                     disabled={loadingComments}
-                    className="px-6 py-2 rounded-full bg-yt-surface hover:bg-yt-hover text-sm font-medium transition-all active:scale-95 inline-flex items-center gap-2"
+                    className="px-6 py-2 rounded-full bg-yt-surface hover:bg-yt-hover text-sm font-medium transition-all inline-flex items-center gap-2"
                   >
                     {loadingComments ? (
                       <>

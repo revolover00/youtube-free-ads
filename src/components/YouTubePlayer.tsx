@@ -85,30 +85,32 @@ export default function YouTubePlayer({
     }
   };
 
-  // Background play support: keep audio running if enabled
+  // Background play support: keep audio running if enabled.
+  // NOTE: a cleanup returned from an event handler is thrown away by the DOM,
+  // so the retry timers have to be owned by the effect itself.
   useEffect(() => {
+    const timers: number[] = [];
+
+    const play = () => {
+      iframeRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: "command", func: "playVideo", args: [] }),
+        "*",
+      );
+    };
+
     const handleVisibility = () => {
       if (!backgroundPlay) return;
-      if (document.visibilityState === "hidden" && iframeRef.current?.contentWindow) {
-        const play = () => {
-          if (!iframeRef.current?.contentWindow) return;
-          iframeRef.current.contentWindow.postMessage(
-            JSON.stringify({ event: "command", func: "playVideo", args: [] }),
-            "*",
-          );
-        };
-        play();
-        const t1 = setTimeout(play, 200);
-        const t2 = setTimeout(play, 600);
-        return () => {
-          clearTimeout(t1);
-          clearTimeout(t2);
-        };
-      }
+      if (document.visibilityState !== "hidden") return;
+      if (!iframeRef.current?.contentWindow) return;
+      play();
+      timers.push(window.setTimeout(play, 200), window.setTimeout(play, 600));
     };
 
     document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      timers.forEach((id) => window.clearTimeout(id));
+    };
   }, [backgroundPlay]);
 
   // Media Session API for lock screen and system media keys

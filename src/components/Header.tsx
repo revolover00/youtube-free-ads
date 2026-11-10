@@ -133,7 +133,7 @@ export default function Header({
         const list = await getNotifications();
         setNotifs(list);
         setUnreadCount(list.filter((n) => !n.read).length);
-      } catch (err) {
+      } catch {
         setNotifsErr(true);
       }
     };
@@ -145,12 +145,11 @@ export default function Header({
   }, []);
 
   useEffect(() => {
-    if (user) {
-      // Initial refresh then every 15 mins
-      refreshNotifications();
-      const timer = setInterval(refreshNotifications, 15 * 60 * 1000);
-      return () => clearInterval(timer);
-    }
+    if (!user) return undefined;
+    // Initial refresh then every 15 mins
+    refreshNotifications();
+    const timer = setInterval(refreshNotifications, 15 * 60 * 1000);
+    return () => clearInterval(timer);
   }, [user]);
 
   const submit = (q: string) => {
@@ -194,7 +193,7 @@ export default function Header({
 
   return (
     <>
-      <header className="fixed top-0 inset-x-0 h-14 z-50 bg-yt-bg flex items-center justify-between gap-2 px-2 sm:px-4">
+      <header className="fixed top-0 inset-x-0 h-14 z-50 bg-yt-bg flex items-center justify-between gap-2 px-2 sm:px-4 lg:ps-4 lg:pe-4">
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           {inWatch ? (
             <button
@@ -237,7 +236,7 @@ export default function Header({
         </div>
 
         {/* desktop search */}
-        <div className="hidden sm:flex flex-1 max-w-[640px] items-center gap-3 mx-2 relative">
+        <div className="hidden sm:flex flex-1 max-w-[732px] items-center gap-2 mx-2 relative">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -245,7 +244,7 @@ export default function Header({
             }}
             className="flex flex-1 h-10 items-center relative"
           >
-            <div className="flex flex-1 items-center h-full rounded-full border border-yt-border bg-yt-bg focus-within:border-yt-blue/70 px-4 transition-colors">
+            <div className="flex flex-1 items-center h-full rounded-s-full border border-yt-border bg-yt-search ps-4 pe-1 focus-within:border-yt-blue">
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -258,7 +257,7 @@ export default function Header({
                 }}
                 onKeyDown={onKeyDown}
                 placeholder={t("searchPlaceholder")}
-                className="flex-1 bg-transparent outline-none text-[15px] placeholder:text-yt-sub"
+                className="flex-1 bg-transparent outline-none text-[16px] leading-6 placeholder:text-yt-dim"
               />
               {query && (
                 <button
@@ -273,7 +272,7 @@ export default function Header({
             </div>
             <button
               type="submit"
-              className="h-full w-16 grid place-items-center rounded-e-full border border-s-0 border-yt-border bg-yt-raised hover:bg-yt-surface transition-colors"
+              className="h-full w-16 grid place-items-center rounded-e-full border border-s-0 border-yt-border bg-yt-btn hover:bg-yt-hover transition-colors"
               aria-label={t("searchTooltip")}
             >
               <Search className="w-5 h-5" />
@@ -300,7 +299,7 @@ export default function Header({
           </form>
           <button
             onClick={startListening}
-            className="w-10 h-10 rounded-full bg-yt-raised hover:bg-yt-surface grid place-items-center shrink-0 transition-colors"
+            className="w-10 h-10 rounded-full bg-[#181818] hover:bg-yt-surface grid place-items-center shrink-0 transition-colors"
             aria-label={t("voiceSearchTooltip")}
           >
             <Mic className="w-5 h-5" />
@@ -320,7 +319,7 @@ export default function Header({
           <div className="relative">
             <button
               onClick={() => setPopover(popover === "create" ? null : "create")}
-              className="hidden sm:flex items-center gap-1.5 h-9 px-3 rounded-full bg-yt-raised hover:bg-yt-surface text-sm font-medium transition-colors"
+              className="hidden sm:flex items-center gap-1.5 h-9 ps-3 pe-4 rounded-full bg-yt-surface hover:bg-yt-hover text-sm font-medium transition-colors"
             >
               <Plus className="w-5 h-5" /> {t("create")}
             </button>
@@ -462,7 +461,7 @@ export default function Header({
             {!user && (
               <button
                 onClick={() => signIn().catch(() => {})}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-yt-blue/40 text-yt-blue hover:bg-yt-blue/10 text-xs sm:text-sm font-semibold transition-colors"
+                className="hidden sm:flex h-9 items-center gap-1.5 ps-3 pe-4 rounded-full border border-yt-border text-yt-blue hover:bg-yt-blue/10 text-sm font-medium transition-colors"
                 title={t("signInWithGoogle")}
               >
                 <LogIn className="w-4 h-4" />
@@ -472,7 +471,7 @@ export default function Header({
 
             <button
               onClick={() => setPopover(popover === "account" ? null : "account")}
-              className="w-8 h-8 rounded-full ms-1 grid place-items-center text-sm font-bold bg-gradient-to-br from-yt-blue to-teal-400 text-black hover:opacity-90 active:scale-95 transition-transform overflow-hidden"
+              className="w-8 h-8 rounded-full ms-2 grid place-items-center text-sm font-medium bg-[#3ea6ff] text-[#0f0f0f] overflow-hidden"
               aria-label={t("account")}
             >
               {user?.photoURL ? (
@@ -498,7 +497,7 @@ export default function Header({
                 <div className="fixed inset-0 z-40" onClick={() => setPopover(null)} />
                 <div className="dropdown-in absolute end-0 top-12 z-50 w-72 rounded-xl bg-yt-raised border border-yt-border py-2 shadow-2xl shadow-black/70 overflow-hidden text-yt-text">
                   <div className="flex items-center gap-3 px-4 py-3 border-b border-yt-border">
-                    <div className="w-10 h-10 rounded-full grid place-items-center font-bold bg-gradient-to-br from-yt-blue to-teal-400 text-black shrink-0 overflow-hidden">
+                    <div className="w-10 h-10 rounded-full grid place-items-center font-bold bg-yt-blue text-[#0f0f0f] shrink-0 overflow-hidden">
                       {user?.photoURL ? (
                         <img
                           src={user.photoURL}
@@ -558,7 +557,7 @@ export default function Header({
                         setPopover(null);
                         setShowImportModal(true);
                       }}
-                      className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg bg-red-600 hover:bg-red-700 active:scale-[0.99] text-white text-xs font-medium transition-all"
+                      className="w-full flex items-center justify-center gap-2 py-1.5 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-medium transition-all"
                     >
                       <Youtube className="w-3.5 h-3.5" />
                       <span>{t("importYouTubeSubs")}</span>

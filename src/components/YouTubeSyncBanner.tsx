@@ -48,7 +48,7 @@ export function YouTubeSyncBanner() {
           <button
             onClick={() => (user ? syncYouTubeData().catch(() => {}) : signIn().catch(() => {}))}
             disabled={importingYouTube}
-            className="w-full sm:w-auto flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-xl bg-yt-text hover:bg-white text-yt-bg font-bold transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 shadow-xl shadow-white/5"
+            className="w-full sm:w-auto flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-xl bg-yt-text hover:bg-white text-yt-bg font-bold transition-all disabled:opacity-50 disabled:hover:scale-100 shadow-xl shadow-white/5"
           >
             {user ? (
               <RefreshCw className={`w-5 h-5 shrink-0 ${importingYouTube ? "animate-spin" : ""}`} />

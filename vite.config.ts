@@ -6,39 +6,43 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import fs from "node:fs";
 import path from "node:path";
-import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { defineConfig, type LovableViteTanstackOptions } from "@lovable.dev/vite-tanstack-config";
 import { VitePWA } from "vite-plugin-pwa";
 
 const isVercel = Boolean(
-  process.env.VERCEL ||
-  process.env.VERCEL_ENV ||
-  process.env.NOW_BUILDER ||
-  process.env.NITRO_PRESET === "vercel" ||
+  process.env["VERCEL"] ||
+  process.env["VERCEL_ENV"] ||
+  process.env["NOW_BUILDER"] ||
+  process.env["NITRO_PRESET"] === "vercel" ||
   (typeof process.cwd === "function" && process.cwd().startsWith("/vercel")) ||
-  (typeof process.env.PWD === "string" && process.env.PWD.startsWith("/vercel")),
+  (typeof process.env["PWD"] === "string" && process.env["PWD"].startsWith("/vercel")),
 );
 
-const nitroPreset = process.env.NITRO_PRESET || (isVercel ? "vercel" : undefined);
+const nitroPreset = process.env["NITRO_PRESET"] || (isVercel ? "vercel" : undefined);
 
 const pwaOutDir = isVercel ? ".vercel/output/static" : ".output/public";
 
-export default defineConfig({
-  nitro: {
-    ...(nitroPreset ? { preset: nitroPreset } : {}),
-    inlineDynamicImports: true,
-    vercel: {
-      entryFormat: "node",
-    },
+/**
+ * `inlineDynamicImports` and `vercel.entryFormat` are forwarded verbatim to
+ * `nitro()` but are deliberately outside the wrapper's narrow typed surface,
+ * so the shape is asserted once here instead of being spread untyped.
+ */
+const nitroOptions = {
+  ...(nitroPreset ? { preset: nitroPreset } : {}),
+  inlineDynamicImports: true,
+  vercel: {
+    entryFormat: "node",
   },
+} as NonNullable<LovableViteTanstackOptions["nitro"]>;
+
+export default defineConfig({
+  nitro: nitroOptions,
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
   },
   vite: {
-    esbuild: {
-      jsxDev: false,
-    },
     plugins: [
       {
         name: "ensure-pwa-outdir",
@@ -125,6 +129,15 @@ export default defineConfig({
     server: {
       host: "0.0.0.0",
       port: 3000,
+      // Dev/preview sandboxes (Lovable, e2b, Codespaces, ngrok…) proxy the dev
+      // server behind a generated hostname. Without this, Vite answers those
+      // requests with "Blocked request. This host is not allowed."
+      allowedHosts: true,
+    },
+    preview: {
+      host: "0.0.0.0",
+      port: 3000,
+      allowedHosts: true,
     },
   },
 });

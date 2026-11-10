@@ -6,6 +6,7 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  type ErrorComponentProps,
 } from "@tanstack/react-router";
 import { registerSW } from "virtual:pwa-register";
 import { useEffect, type ReactNode } from "react";
@@ -38,11 +39,15 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  console.error(error);
+function ErrorComponent({ error, reset }: ErrorComponentProps) {
+  // TanStack hands the boundary an `unknown`; normalise before anything reads
+  // `.message` off it, otherwise a thrown string renders as "undefined".
+  const err = error instanceof Error ? error : new Error(String(error));
+  console.error(err);
   const router = useRouter();
   useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
+    reportLovableError(err, { boundary: "tanstack_root_error_component" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [error]);
 
   return (
@@ -55,7 +60,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           Something went wrong on our end. You can try refreshing or head back home.
         </p>
         <p className="mt-4 p-4 bg-red-500/10 text-red-500 text-xs rounded text-left break-all font-mono">
-          {error?.message || String(error)}
+          {err.message || String(error)}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
@@ -117,7 +122,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Cairo:wght@400;700;900&family=Tajawal:wght@400;500;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Tajawal:wght@400;500;700&display=swap",
       },
     ],
     scripts: [
@@ -134,6 +139,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
+/*
+ * Applies the saved language to <html lang/dir> before first paint.
+ * useLanguage() can only read localStorage in an effect (reading it during
+ * render would desync SSR hydration), so without this the first frame is
+ * always LTR English and Arabic users see a flash plus a layout jump.
+ */
+const LANG_BOOTSTRAP = `(function(){try{var l=localStorage.getItem("yt_lang");if(l!=="ar"&&l!=="en")l="en";var e=document.documentElement;e.lang=l;e.dir=l==="ar"?"rtl":"ltr";}catch(_){}})();`;
+
 function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en" dir="ltr">
@@ -141,6 +154,7 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: LANG_BOOTSTRAP }} />
         {children}
         <Scripts />
       </body>

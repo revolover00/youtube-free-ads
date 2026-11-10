@@ -134,7 +134,7 @@ export default function PlaylistPage(props: Props) {
               <button
                 onClick={() => list[0] && props.onOpen(list[0])}
                 disabled={!list.length}
-                className="flex-1 h-9 rounded-full bg-white text-black text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 transition-transform"
+                className="flex-1 h-9 rounded-full bg-white text-black text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-transform"
               >
                 <PlayCircle className="w-4 h-4" /> {isAr ? "تشغيل الكل" : "Play all"}
               </button>

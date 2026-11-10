@@ -9,6 +9,7 @@
     "vercel-build": "NODE_ENV=production NITRO_PRESET=vercel vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

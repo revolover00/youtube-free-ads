@@ -57,6 +57,8 @@ interface Props {
   onClearHistory: () => void;
   isSaved: (id: string) => boolean;
   onSaveLater: (id: string, video?: PipedVideo) => void;
+  /** Open the "add to playlist" dialog for a video. */
+  onAddToPlaylist?: (v: PipedVideo) => void;
 }
 
 function normalizeKey(page: string): string {
@@ -239,6 +241,7 @@ export default function LibraryPage(props: Props) {
     onChannel: props.onChannel,
     saved: props.isSaved(v.url.split("v=")[1]),
     onSaveLater: () => props.onSaveLater(v.url.split("v=")[1], v),
+    onAddToPlaylist: props.onAddToPlaylist,
   });
 
   // ---- Playlists overview ----
@@ -279,7 +282,7 @@ export default function LibraryPage(props: Props) {
           </h1>
           <button
             onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 h-9 px-4 rounded-full bg-yt-blue text-black font-bold text-sm active:scale-95 transition-transform"
+            className="flex items-center gap-2 h-9 px-4 rounded-full bg-yt-blue text-black font-bold text-sm transition-transform"
           >
             <Plus className="w-4 h-4" />
             {t("newPlaylist")}
@@ -316,7 +319,7 @@ export default function LibraryPage(props: Props) {
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-x-4 gap-y-8">
+        <div className="yt-grid">
           {allLists.map((pl, i) => (
             <button
               key={pl.key}
@@ -387,7 +390,7 @@ export default function LibraryPage(props: Props) {
         ) : remote.length === 0 ? (
           <EmptyState message={meta.empty} />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-x-4 gap-y-8">
+          <div className="yt-grid">
             {remote.map((v, i) => (
               <VideoCard key={v.url} {...cardProps(v, i)} />
             ))}
@@ -429,7 +432,7 @@ export default function LibraryPage(props: Props) {
               <button
                 onClick={() => list[0] && props.onOpen(list[0])}
                 disabled={!list.length}
-                className="flex-1 h-9 rounded-full bg-white text-black text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95 transition-transform"
+                className="flex-1 h-9 rounded-full bg-white text-black text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-transform"
               >
                 <PlayCircle className="w-4 h-4" /> {t("playAll")}
               </button>

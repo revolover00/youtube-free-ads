@@ -20,6 +20,7 @@ import {
   browsePageFn,
   commentsPageFn,
   homeCandidatesFn,
+  videoFrameFn,
 } from "./youtube.functions";
 import type {
   ChannelData,
@@ -28,6 +29,7 @@ import type {
   PlaylistData,
   SearchChannel,
   SearchPlaylist,
+  StoryboardFrame,
   StreamData,
 } from "./types";
 
@@ -167,4 +169,18 @@ export async function homeCandidates(params: {
   queries: string[];
 }) {
   return run("تجميع المرشحات للصفحة الرئيسية", () => homeCandidatesFn({ data: params }));
+}
+
+/**
+ * Resolve the frame displayed at `time` seconds as inline base64.
+ *
+ * The browser cannot read pixels out of the cross-origin player iframe, so the
+ * server fetches YouTube's own storyboard sprite (the images behind the scrub
+ * preview) and hands back the tile geometry. Inlining it keeps the client
+ * canvas untainted, which is what makes "download / copy" possible at all.
+ */
+export async function captureFrame(videoId: string, time: number): Promise<StoryboardFrame> {
+  return run(`لقطة · ${videoId} @ ${Math.round(time)}s`, () =>
+    videoFrameFn({ data: { id: videoId, time: Math.max(0, Math.floor(time)) } }),
+  );
 }

@@ -153,7 +153,7 @@ export default function PlaylistDialog({ open, onClose, video, notify }: Props) 
                 <button
                   onClick={handleCreateAndAdd}
                   disabled={!newTitle.trim()}
-                  className="flex-1 bg-white text-black h-11 rounded-xl font-bold active:scale-[0.98] transition-all disabled:opacity-50"
+                  className="flex-1 bg-white text-black h-11 rounded-xl font-bold transition-all disabled:opacity-50"
                 >
                   {isAr ? "إنشاء وإضافة" : "Create and add"}
                 </button>

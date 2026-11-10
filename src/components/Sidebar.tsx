@@ -48,13 +48,8 @@ function Item({
   onClick?: () => void;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-5 px-3 h-10 rounded-lg text-sm transition-colors text-start ${
-        active ? "bg-yt-surface font-bold text-white" : "hover:bg-yt-surface/70 text-yt-text/90"
-      }`}
-    >
-      <Icon className="w-5 h-5 shrink-0" />
+    <button onClick={onClick} className="yt-guide-item" data-active={active ? "true" : "false"}>
+      <Icon className="w-6 h-6 shrink-0" />
       <span className="truncate">{label}</span>
     </button>
   );
@@ -97,7 +92,7 @@ function FullContent({
   ];
 
   return (
-    <div className="px-3 pb-8">
+    <div className="px-3 pb-8 pt-3">
       <div className="py-2">
         {MAIN.map((m) => (
           <Item
@@ -113,10 +108,10 @@ function FullContent({
         ))}
       </div>
 
-      <hr className="border-yt-border my-2" />
+      <hr className="yt-divider" />
 
       <div className="py-1">
-        <button className="flex items-center gap-1.5 px-3 h-9 text-[15px] font-bold text-yt-text">
+        <button className="flex items-center gap-1.5 px-3 h-12 text-[16px] font-medium text-yt-text">
           {t("you")}
           <ChevronDown className="w-4 h-4" />
         </button>
@@ -140,10 +135,10 @@ function FullContent({
         ))}
       </div>
 
-      <hr className="border-yt-border my-2" />
+      <hr className="yt-divider" />
 
       <div className="py-1">
-        <h3 className="px-3 h-9 flex items-center text-[15px] font-bold text-yt-text">
+        <h3 className="px-3 h-12 flex items-center text-[16px] font-medium text-yt-text">
           {t("subscriptions")}
         </h3>
         {subs.length === 0 && (
@@ -153,7 +148,7 @@ function FullContent({
           <button
             key={s.channel_id}
             onClick={() => onNavigate(`channel:${s.channel_id}`)}
-            className="w-full flex items-center gap-5 px-3 h-10 rounded-lg text-sm hover:bg-yt-surface/70 text-start"
+            className="yt-guide-item"
           >
             {s.channel_avatar_url ? (
               <img
@@ -179,10 +174,10 @@ function FullContent({
         ))}
       </div>
 
-      <hr className="border-yt-border my-2" />
+      <hr className="yt-divider" />
 
       <div className="py-1">
-        <h3 className="px-3 h-9 flex items-center text-[15px] font-bold text-yt-text">
+        <h3 className="px-3 h-12 flex items-center text-[16px] font-medium text-yt-text">
           {t("explore")}
         </h3>
         {EXPLORE.map((e) => (
@@ -196,7 +191,7 @@ function FullContent({
         ))}
       </div>
 
-      <hr className="border-yt-border my-2" />
+      <hr className="yt-divider" />
 
       <div className="py-1">
         <Item icon={Settings} label={t("settings")} onClick={onOpenSettings} />
@@ -215,21 +210,21 @@ function FullContent({
         <Item icon={HelpCircle} label={t("help")} onClick={() => onNavigate(t("help"))} />
       </div>
 
-      <div className="px-3 pt-4 text-xs text-yt-sub leading-relaxed">
+      <div className="px-6 pt-4 text-[13px] leading-[18px] text-yt-dim">
         <button
           onClick={() => onNavigate("policies")}
-          className="font-bold text-[13px] text-yt-text/80 hover:text-white mb-2 text-start block transition-colors"
+          className="mb-3 block text-start font-medium text-yt-dim hover:text-yt-sub"
         >
           {isAr ? "الحقوق والسياسات والأمان" : "Policies, Terms & Safety"}
         </button>
         <button
           onClick={() => onNavigate("policies")}
-          className="text-start block hover:underline text-yt-sub hover:text-yt-text transition-colors"
+          className="block text-start text-yt-dim hover:text-yt-sub"
         >
           {t("terms")}
         </button>
         <p className="mt-1">{t("howWorks")}</p>
-        <p className="mt-3">{t("copyright")}</p>
+        <p className="mt-4">{t("copyright")}</p>
       </div>
     </div>
   );
@@ -253,45 +248,45 @@ export default function Sidebar({
     <>
       {/* desktop mini */}
       {pushable && !expanded && (
-        <nav className="hidden md:flex fixed top-14 bottom-0 start-0 w-[72px] z-30 bg-yt-bg flex-col items-center pt-1 gap-1 border-e border-yt-border/40">
+        <nav className="hidden md:flex fixed top-14 bottom-0 start-0 w-[72px] z-30 bg-yt-bg flex-col items-center pt-1 gap-0">
           <button
             onClick={onHome}
-            className={`w-16 py-3.5 rounded-xl flex flex-col items-center gap-1.5 text-[10px] transition-colors ${
-              active === "home" || active === t("home")
-                ? "bg-yt-surface font-bold text-white"
-                : "hover:bg-yt-surface/70 text-yt-sub"
-            }`}
+            className="yt-mini-item"
+            data-active={active === "home" || active === t("home") ? "true" : "false"}
           >
             <Home className="w-6 h-6" />
-            <span>{t("home")}</span>
+            <span className="truncate max-w-full px-1">{t("home")}</span>
           </button>
           <button
             onClick={() => onNavigate(t("shorts"))}
-            className="w-16 py-3.5 rounded-xl flex flex-col items-center gap-1.5 text-[10px] hover:bg-yt-surface/70 text-yt-sub transition-colors"
+            className="yt-mini-item"
+            data-active={active === t("shorts") ? "true" : "false"}
           >
             <ShortsIcon className="w-6 h-6" />
-            <span>{t("shorts")}</span>
+            <span className="truncate max-w-full px-1">{t("shorts")}</span>
           </button>
           <button
             onClick={() => onNavigate(t("subscriptions"))}
-            className="w-16 py-3.5 rounded-xl flex flex-col items-center gap-1.5 text-[10px] hover:bg-yt-surface/70 text-yt-sub transition-colors"
+            className="yt-mini-item"
+            data-active={active === t("subscriptions") ? "true" : "false"}
           >
             <SubscriptionsIcon className="w-6 h-6" />
-            <span>{t("subscriptions")}</span>
+            <span className="truncate max-w-full px-1">{t("subscriptions")}</span>
           </button>
           <button
             onClick={() => onNavigate(t("yourChannel"))}
-            className="w-16 py-3.5 rounded-xl flex flex-col items-center gap-1.5 text-[10px] hover:bg-yt-surface/70 text-yt-sub transition-colors"
+            className="yt-mini-item"
+            data-active={active === t("yourChannel") ? "true" : "false"}
           >
             <UserRound className="w-6 h-6" />
-            <span>{t("you")}</span>
+            <span className="truncate max-w-full px-1">{t("you")}</span>
           </button>
         </nav>
       )}
 
       {/* desktop full */}
       {pushable && expanded && (
-        <nav className="hidden md:block fixed top-14 bottom-0 start-0 w-60 z-30 bg-yt-bg overflow-y-auto border-e border-yt-border/40">
+        <nav className="hidden md:block fixed top-14 bottom-0 start-0 w-60 z-30 bg-yt-bg overflow-y-auto overflow-x-hidden">
           <FullContent
             active={active}
             subs={subs}

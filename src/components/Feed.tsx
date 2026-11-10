@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getStreams } from "../lib/api";
-import { useAppStore } from "../lib/appStore";
+import { appStore, useAppStore } from "../lib/appStore";
 import {
   Clock,
   Share2,
@@ -104,22 +104,16 @@ export function ChipsBar({
     : defaultChips;
 
   return (
-    <div className="sticky top-14 z-40 bg-yt-bg/95 backdrop-blur-sm py-3 -mx-1 px-1">
-      <div className="flex gap-2.5 overflow-x-auto no-scrollbar px-1 items-center">
+    <div className="sticky top-14 z-40 bg-yt-bg py-3">
+      <div className="flex gap-3 overflow-x-auto no-scrollbar items-center">
         {onOpenAIAlgorithm && (
           <button
             onClick={onOpenAIAlgorithm}
-            className={`shrink-0 h-8 px-3 rounded-lg text-xs font-bold transition-all duration-200 active:scale-95 whitespace-nowrap flex items-center gap-1.5 shadow-sm ${
-              isAIActive
-                ? "bg-gradient-to-r from-purple-600 to-red-600 hover:from-purple-500 hover:to-red-500 text-white shadow-purple-900/30"
-                : "bg-purple-600/15 text-purple-300 border border-purple-500/30 hover:bg-purple-600/25"
-            }`}
+            className="yt-chip flex items-center gap-1.5"
+            data-selected={isAIActive ? "true" : "false"}
           >
-            <Sparkles className="w-3.5 h-3.5 shrink-0" />
-            <span>{isAr ? "خوارزمية الذكاء الاصطناعي" : "AI Algorithm"}</span>
-            {isAIActive && (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse shrink-0" />
-            )}
+            <Sparkles className="w-4 h-4 shrink-0" />
+            <span>{isAr ? "خوارزمية الذكاء" : "AI feed"}</span>
           </button>
         )}
 
@@ -129,11 +123,8 @@ export function ChipsBar({
             <button
               key={c.id}
               onClick={() => onChange(c.id)}
-              className={`shrink-0 h-8 px-3.5 rounded-lg text-sm font-medium transition-all duration-200 active:scale-95 whitespace-nowrap ${
-                isSelected
-                  ? "bg-yt-text text-yt-bg font-bold shadow"
-                  : "bg-yt-surface text-yt-text hover:bg-yt-hover"
-              }`}
+              className="yt-chip"
+              data-selected={isSelected ? "true" : "false"}
             >
               {c.label}
             </button>
@@ -304,7 +295,7 @@ export function VideoCard({
   notify: (m: string) => void;
   onChannel?: (channelId: string, name: string) => void;
   onSaveLater?: () => void;
-  onAddToPlaylist?: () => void;
+  onAddToPlaylist?: (v: PipedVideo) => void;
   saved?: boolean;
   layout?: "grid" | "list";
 }) {
@@ -356,7 +347,7 @@ export function VideoCard({
       saved={!!saved}
       videoUrl={video.url}
       onSaveLater={() => onSaveLater?.()}
-      onAddToPlaylist={() => onAddToPlaylist?.()}
+      onAddToPlaylist={() => onAddToPlaylist?.(video)}
       onDismiss={() => {
         onDismiss?.(id);
       }}
@@ -380,7 +371,7 @@ export function VideoCard({
     : undefined;
 
   const thumb = (
-    <div className="relative aspect-video rounded-xl overflow-hidden bg-yt-raised transition-all duration-300 ease-out group-hover:scale-[1.02] group-hover:shadow-lg group-hover:shadow-black/25">
+    <div className="relative aspect-video rounded-xl overflow-hidden bg-[#1f1f1f]">
       <img
         src={thumbSrc}
         srcSet={srcSet}
@@ -390,20 +381,20 @@ export function VideoCard({
         fetchPriority={index < 4 ? "high" : "low"}
         decoding="async"
         referrerPolicy="no-referrer"
-        className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
+        className="w-full h-full object-cover"
       />
       {isLive ? (
-        <span className="absolute bottom-1.5 end-1.5 bg-yt-red text-white text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded flex items-center gap-1.5 shadow-md z-10">
+        <span className="yt-badge-time flex items-center gap-1.5 !bg-yt-red">
           <span className="w-2 h-2 rounded-full bg-white live-dot" />
           <span>{lang === "ar" ? "مباشر" : "LIVE"}</span>
         </span>
       ) : isShort ? (
-        <span className="absolute bottom-1.5 end-1.5 bg-black/85 text-white text-[11px] sm:text-xs font-semibold px-1.5 py-0.5 rounded flex items-center gap-1 z-10">
+        <span className="yt-badge-time flex items-center gap-1">
           <ShortsIcon className="w-3.5 h-3.5 text-yt-red" />
           <span>{durationStr || (lang === "ar" ? "شورتس" : "Shorts")}</span>
         </span>
       ) : durationStr ? (
-        <span className="absolute bottom-1.5 end-1.5 text-white text-xs font-semibold px-1.5 py-0.5 rounded bg-black/80 z-10">
+        <span className="yt-badge-time">
           {pct >= 2 && pct < 90 && remainingStr ? (
             <>
               <span className="group-hover:hidden">{durationStr}</span>
@@ -417,17 +408,17 @@ export function VideoCard({
         </span>
       ) : null}
       {isWatched && (
-        <span className="absolute top-2 start-2 bg-black/80 text-white text-[11px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 z-10">
+        <span className="absolute top-2 start-2 z-10 rounded bg-black/80 px-1 py-[3px] text-[12px] font-medium leading-3 text-white">
           {lang === "ar" ? "تمت المشاهدة" : "Watched"}
         </span>
       )}
       {saved && (
-        <span className="absolute top-2 end-2 bg-black/75 text-white text-[11px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 z-10">
+        <span className="absolute top-2 end-2 z-10 flex items-center gap-1 rounded bg-black/80 px-1 py-[3px] text-[12px] font-medium leading-3 text-white">
           <Clock className="w-3 h-3" /> {lang === "ar" ? "محفوظ" : "Saved"}
         </span>
       )}
       {pct >= 2 && (
-        <div className="absolute bottom-0 inset-x-0 h-[3px] bg-white/30 z-10">
+        <div className="absolute bottom-0 inset-x-0 h-1 bg-white/30 z-10">
           <div
             className="h-full bg-yt-red transition-all duration-300"
             style={{ width: `${pct}%` }}
@@ -443,23 +434,17 @@ export function VideoCard({
         ref={cardRef}
         onMouseEnter={handlePrefetch}
         className="rise group cursor-pointer flex gap-3 sm:gap-4"
-        style={{
-          contentVisibility: "auto",
-          containIntrinsicSize: "0 140px",
-          ...(index < 12 ? { animationDelay: `${index * 40}ms` } : {}),
-        }}
+        style={{ contentVisibility: "auto", containIntrinsicSize: "0 140px" }}
         onClick={() => onOpen(video)}
       >
         <div className="w-40 sm:w-64 shrink-0">{thumb}</div>
         <div className="flex-1 min-w-0 py-0.5">
           <h3
-            className={`text-[15px] sm:text-lg font-medium leading-snug line-clamp-2 ${
-              isWatched ? "opacity-60" : ""
-            }`}
+            className={`yt-title sm:text-[18px] sm:leading-[26px] ${isWatched ? "opacity-60" : ""}`}
           >
             {video.title}
           </h3>
-          <div className="text-[13px] text-yt-sub mt-1">
+          <div className="yt-meta mt-1">
             {fmtViews(video.views, lang) && `${fmtViews(video.views, lang)} ${t("views")} · `}
             {timeAgo(video.uploaded, video.uploadedDate, lang)}
           </div>
@@ -468,7 +453,7 @@ export function VideoCard({
               e.stopPropagation();
               onChannel?.(video.uploaderUrl || "", video.uploaderName);
             }}
-            className="mt-2 flex items-center gap-2 text-[13px] text-yt-sub hover:text-yt-text"
+            className="yt-meta mt-2 flex items-center gap-2 hover:text-yt-text"
           >
             <Avatar
               src={video.uploaderAvatar}
@@ -489,11 +474,7 @@ export function VideoCard({
       ref={cardRef}
       onMouseEnter={handlePrefetch}
       className="rise group cursor-pointer"
-      style={{
-        contentVisibility: "auto",
-        containIntrinsicSize: "0 300px",
-        ...(index < 12 ? { animationDelay: `${index * 50}ms` } : {}),
-      }}
+      style={{ contentVisibility: "auto", containIntrinsicSize: "0 300px" }}
       onClick={() => onOpen(video)}
     >
       {thumb}
@@ -503,30 +484,24 @@ export function VideoCard({
             e.stopPropagation();
             onChannel?.(video.uploaderUrl || "", video.uploaderName);
           }}
-          className="mt-0.5 transition-transform hover:scale-105 shrink-0"
+          className="shrink-0"
           aria-label={video.uploaderName}
         >
           <Avatar src={video.uploaderAvatar} name={video.uploaderName} />
         </button>
         <div className="flex-1 min-w-0">
-          <h3
-            className={`text-[15px] font-medium leading-snug line-clamp-2 text-yt-text group-hover:text-white ${
-              isWatched ? "opacity-60" : ""
-            }`}
-          >
-            {video.title}
-          </h3>
+          <h3 className={`yt-title ${isWatched ? "opacity-60" : ""}`}>{video.title}</h3>
           <button
             onClick={(e) => {
               e.stopPropagation();
               onChannel?.(video.uploaderUrl || "", video.uploaderName);
             }}
-            className="mt-1 text-[13px] text-yt-sub flex items-center gap-1 hover:text-yt-text truncate"
+            className="yt-meta mt-1 flex max-w-full items-center gap-1 truncate hover:text-yt-text"
           >
             <span className="truncate">{video.uploaderName}</span>
             {video.uploaderVerified && <BadgeCheck className="w-3.5 h-3.5 shrink-0 text-yt-sub" />}
           </button>
-          <div className="text-[13px] text-yt-sub">
+          <div className="yt-meta">
             {fmtViews(video.views, lang) && (
               <>
                 {fmtViews(video.views, lang)} {t("views")} ·{" "}
@@ -589,7 +564,7 @@ export function ChannelResultCard({
           e.stopPropagation();
           onToggleSub();
         }}
-        className={`h-9 px-4 rounded-full text-sm font-bold shrink-0 active:scale-95 transition-all ${
+        className={`h-9 px-4 rounded-full text-sm font-bold shrink-0 transition-all ${
           subscribed
             ? "bg-yt-surface text-yt-text hover:bg-yt-hover"
             : "bg-yt-text text-yt-bg hover:bg-white/85"
@@ -625,7 +600,7 @@ export function PlaylistCard({
             alt={playlist.title}
             loading="lazy"
             referrerPolicy="no-referrer"
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.06]"
+            className="w-full h-full object-cover"
           />
         ) : (
           <div className="w-full h-full bg-yt-surface" />
@@ -636,10 +611,8 @@ export function PlaylistCard({
           <span className="text-[11px]">{lang === "ar" ? "فيديو" : "videos"}</span>
         </div>
       </div>
-      <h3 className="text-[15px] font-medium leading-snug line-clamp-2 mt-3 text-yt-text group-hover:text-white">
-        {playlist.title}
-      </h3>
-      <p className="text-[13px] text-yt-sub mt-1">
+      <h3 className="yt-title mt-3">{playlist.title}</h3>
+      <p className="yt-meta mt-1">
         {playlist.uploaderName || (lang === "ar" ? "قائمة تشغيل" : "Playlist")}
       </p>
     </article>
@@ -696,9 +669,9 @@ export function ShortsShelf({
 
 export function SkeletonGrid({ count = 8 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-x-4 gap-y-8 mt-2">
+    <div className="yt-grid mt-2">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="animate-pulse" style={{ animationDelay: `${i * 60}ms` }}>
+        <div key={i} className="animate-pulse">
           <div className="aspect-video rounded-xl bg-yt-surface" />
           <div className="flex gap-3 mt-3">
             <div className="w-9 h-9 rounded-full bg-yt-surface shrink-0" />
@@ -725,7 +698,7 @@ export function ErrorState({ message, onRetry }: { message?: string; onRetry: ()
       <p className="text-yt-sub text-sm mt-1 max-w-sm">{message || t("loadError")}</p>
       <button
         onClick={onRetry}
-        className="mt-5 h-10 px-6 rounded-full bg-yt-text text-yt-bg font-bold text-sm flex items-center gap-2 hover:bg-white/85 active:scale-95 transition-all"
+        className="mt-5 h-10 px-6 rounded-full bg-yt-text text-yt-bg font-bold text-sm flex items-center gap-2 hover:bg-white/85 transition-all"
       >
         <RefreshCw className="w-4 h-4" /> {t("retry")}
       </button>

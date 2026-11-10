@@ -180,7 +180,6 @@ export const TRANSLATIONS = {
     clearHistorySubtitle: "Remove all watched videos from this device",
 
     // Channel & Shorts & Library & Navigation
-    about: "About",
     searchInChannel: "Search in channel",
     noShortsInChannel: "No shorts available for this channel",
     playlistsNotAvailable: "Playlists are not available currently",
@@ -224,6 +223,30 @@ export const TRANSLATIONS = {
     trendingEmptyMessage: "No trending content right now.",
     noContent: "No content.",
     noResultsGeneric: "No results.",
+
+    // Missing keys referenced by components (were rendering as raw key names)
+    videos: "Videos",
+    watchFullVideo: "Watch full video",
+    backAndMinimize: "Back and minimise",
+    noNewNotifications: "No new notifications",
+    channelsImported: "channels imported",
+    signInGoogleBenefit: "Sync your library across devices",
+    videosSavedOnDevice: "videos saved on this device",
+    loadingHistoryData: "Loading your watch history…",
+    screenshot: "Screenshot",
+    screenshotTitle: "Frame capture",
+    screenshotHint: "Captured from the moment you are watching",
+    screenshotQuick: "Quick",
+    screenshotHd: "HD",
+    screenshotDownload: "Download",
+    screenshotCopy: "Copy",
+    screenshotCopied: "Frame copied to the clipboard",
+    screenshotShare: "Share",
+    screenshotWatermark: "Caption card",
+    screenshotFailed: "Could not capture this frame",
+    screenshotWorking: "Capturing frame…",
+    screenshotHdHint: "Pick this tab in the prompt for a full-resolution grab",
+    screenshotSourcePoster: "Exact frame unavailable — showing the video poster",
   },
   ar: {
     // Brand
@@ -400,7 +423,6 @@ export const TRANSLATIONS = {
     clearHistorySubtitle: "حذف جميع مقاطع الفيديو التي تمت مشاهدتها من السجل",
 
     // Channel & Shorts & Library & Navigation
-    about: "لمحة",
     searchInChannel: "بحث في القناة",
     noShortsInChannel: "لا توجد مقاطع قصيرة في هذه القناة",
     playlistsNotAvailable: "قوائم التشغيل غير متاحة حالياً",
@@ -444,10 +466,37 @@ export const TRANSLATIONS = {
     trendingEmptyMessage: "لا يوجد محتوى رائج حالياً.",
     noContent: "لا يوجد محتوى.",
     noResultsGeneric: "لا توجد نتائج.",
+
+    // Missing keys referenced by components (were rendering as raw key names)
+    videos: "الفيديوهات",
+    watchFullVideo: "مشاهدة الفيديو كاملاً",
+    backAndMinimize: "رجوع وتصغير",
+    noNewNotifications: "لا توجد إشعارات جديدة",
+    channelsImported: "قناة مستوردة",
+    signInGoogleBenefit: "زامن مكتبتك على كل أجهزتك",
+    videosSavedOnDevice: "فيديو محفوظ على هذا الجهاز",
+    loadingHistoryData: "جارٍ تحميل سجل المشاهدة…",
+    screenshot: "لقطة",
+    screenshotTitle: "لقطة من الفيديو",
+    screenshotHint: "اللقطة من اللحظة التي تشاهدها الآن",
+    screenshotQuick: "سريعة",
+    screenshotHd: "جودة عالية",
+    screenshotDownload: "تنزيل",
+    screenshotCopy: "نسخ",
+    screenshotCopied: "تم نسخ اللقطة إلى الحافظة",
+    screenshotShare: "مشاركة",
+    screenshotWatermark: "بطاقة بالمعلومات",
+    screenshotFailed: "تعذّر التقاط هذه اللحظة",
+    screenshotWorking: "جارٍ التقاط اللقطة…",
+    screenshotHdHint: "اختر هذه الصفحة من نافذة الإذن للحصول على دقة كاملة",
+    screenshotSourcePoster: "تعذّر جلب اللحظة بدقة — هذه صورة الفيديو",
   },
 };
 
 export type TranslationKey = keyof typeof TRANSLATIONS.en;
+
+/** Writing direction. Matches Radix's `Direction` so it can be passed straight through. */
+export type Direction = "ltr" | "rtl";
 
 export function getLanguage(): Language {
   if (typeof window === "undefined") return "en"; // Default is English
@@ -496,7 +545,7 @@ export function useLanguage() {
 
   return {
     lang,
-    dir: lang === "ar" ? "rtl" : "ltr",
+    dir: (lang === "ar" ? "rtl" : "ltr") as Direction,
     isAr: lang === "ar",
     isEn: lang === "en",
     setLang: changeLanguage,

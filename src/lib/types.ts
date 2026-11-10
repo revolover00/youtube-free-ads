@@ -32,11 +32,32 @@ export interface PipedComment {
   replyCount?: number;
 }
 
+/** Filter chips shown above search results. */
+export type SearchFilter =
+  "All" | "Shorts" | "Unwatched" | "Watched" | "Videos" | "Recently uploaded" | "Live";
+
+/** One addressable frame on a YouTube storyboard sprite sheet. */
+export interface StoryboardFrame {
+  /** base64 data URL of the sprite sheet holding the frame. */
+  sheet: string;
+  /** Pixel geometry of the requested frame inside the sheet. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Timestamp (seconds) the returned frame actually represents. */
+  at: number;
+  /** `storyboard` = real frame at `at`; `poster` = whole-video thumbnail. */
+  source: "storyboard" | "poster";
+}
+
 export interface StreamData {
   title: string;
   description: string;
   uploadDate: string;
   relativeDate?: string;
+  /** Runtime in seconds (0 when YouTube does not report it, e.g. live). */
+  duration: number;
   category: string;
   likes: number;
   views: number;
@@ -74,6 +95,7 @@ export interface Subscription {
   channel_id: string;
   channel_name: string;
   channel_avatar_url?: string;
+  subscriber_count?: number | string;
   added_at?: string;
 }
 

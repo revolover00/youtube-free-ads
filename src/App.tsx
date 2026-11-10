@@ -90,6 +90,7 @@ import {
   dismissVideo,
   dismissChannel,
   undoDismiss,
+  setMeta,
 } from "./lib/store";
 import { useAuth } from "./lib/AuthContext";
 import type {
@@ -1004,6 +1005,7 @@ export default function App() {
         appStore.setMiniplayer({ video: r.video, time });
         return { type: "home" };
       });
+      return undefined;
     }
   }, [urlVideoId, setRoute]);
 
@@ -1504,6 +1506,10 @@ export default function App() {
             onToggleSub={doToggleSub}
             onDismiss={(id) => setHidden((h) => [...h, id])}
             onOpenShort={(items, index) => setShorts({ items, index })}
+            onAddToPlaylist={(v) => {
+              setPlaylistTargetVideo(v);
+              setPlaylistDialogOpen(true);
+            }}
           />
         )}
 
@@ -1516,7 +1522,7 @@ export default function App() {
             onDismiss={(id) => setHidden((h) => [...h, id])}
             isSaved={(id) => watchLater.includes(id)}
             onSaveLater={toggleLater}
-            onAddToPlaylist={(v) => {
+            onAddToPlaylist={(v: PipedVideo) => {
               setPlaylistTargetVideo(v);
               setPlaylistDialogOpen(true);
             }}
@@ -1597,7 +1603,7 @@ export default function App() {
                 </p>
                 <button
                   onClick={() => setImportModalOpen(true)}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-semibold transition-all shadow-lg shadow-red-600/20"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-all shadow-lg shadow-red-600/20"
                 >
                   <span>
                     {isAr
@@ -1631,7 +1637,7 @@ export default function App() {
 
                 {/* Search Playlists Results */}
                 {showPlaylistsInSearch && playlists.length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-x-4 gap-y-8 mb-8 mt-2">
+                  <div className="yt-grid mb-8 mt-2">
                     {playlists.map((p, i) => (
                       <PlaylistCard
                         key={p.id}
@@ -1652,7 +1658,7 @@ export default function App() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-x-4 gap-y-8 mt-2">
+                <div className="yt-grid mt-2">
                   {first.map((v, i) => (
                     <VideoCard key={v.url} {...cardProps(v, i)} />
                   ))}
@@ -1663,7 +1669,7 @@ export default function App() {
                     onOpen={(i) => setShorts({ items: shortsItems, index: i })}
                   />
                 )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-x-4 gap-y-8">
+                <div className="yt-grid">
                   {rest.map((v, i) => (
                     <VideoCard key={v.url} {...cardProps(v, i + 4)} />
                   ))}
@@ -1817,9 +1823,10 @@ export default function App() {
       {shorts && (
         <ShortsViewer
           items={shorts.items}
-          initialIndex={shorts.index}
+          startIndex={shorts.index}
           onClose={() => setShorts(null)}
-          onOpenWatch={(v) => openVideo(v, true)}
+          onOpenWatch={(v: PipedVideo) => openVideo(v, true)}
+          notify={notify}
         />
       )}
 
@@ -1904,13 +1911,13 @@ export default function App() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={cancelAutoplay}
-                  className="px-4 py-2 rounded-full bg-yt-surface hover:bg-yt-hover text-xs font-bold transition-all active:scale-95 cursor-pointer"
+                  className="px-4 py-2 rounded-full bg-yt-surface hover:bg-yt-hover text-xs font-bold transition-all cursor-pointer"
                 >
                   {isAr ? "إلغاء" : "Cancel"}
                 </button>
                 <button
                   onClick={playAutoplayNow}
-                  className="px-5 py-2 rounded-full bg-yt-blue text-black hover:bg-opacity-90 text-xs font-bold transition-all active:scale-95 flex items-center gap-1.5 shadow-lg shadow-yt-blue/20 cursor-pointer"
+                  className="px-5 py-2 rounded-full bg-yt-blue text-black hover:bg-opacity-90 text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg shadow-yt-blue/20 cursor-pointer"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
                   <span>{isAr ? "تشغيل الآن" : "Play now"}</span>

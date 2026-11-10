@@ -531,7 +531,7 @@ export function YouTubeImportModal({ isOpen, onClose, onImportSuccess }: Props) 
               <button
                 type="submit"
                 disabled={isProcessing || !pastedText.trim()}
-                className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 active:scale-[0.99] text-white text-xs font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isProcessing ? (
                   <RefreshCw className="w-4 h-4 animate-spin" />
@@ -588,7 +588,7 @@ export function YouTubeImportModal({ isOpen, onClose, onImportSuccess }: Props) 
               <button
                 disabled={importingYouTube}
                 onClick={handleOAuthSync}
-                className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 active:scale-[0.99] text-white text-xs font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-red-600/20"
+                className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-red-600/20"
               >
                 <RefreshCw className={`w-4 h-4 ${importingYouTube ? "animate-spin" : ""}`} />
                 <span>
