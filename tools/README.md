@@ -184,7 +184,11 @@ through an injected `::after` rule. It has to be a stylesheet, not
 the next render, silently undoing a direct mutation. Under the scrim that
 colour becomes `rgb(0,80,102)`, so the two are trivially distinguishable.
 
-12 assertions, sampled at two points — the centre (where the dialog *panel*
+20 assertions across three scenarios — a browser where capture has worked
+before (prompts straight away), a first visit (must *not* prompt unannounced,
+must offer the explained button, and must remember once it works), and a
+refusal (must explain itself, keep offering the retry, and never disable
+anything). The pixels are sampled at two points — the centre (where the dialog *panel*
 would land) and an off-centre point inside the player (where the bare *scrim*
 would land), because those are different failure modes at different pixels.
 Also covered: the overlay's computed `visibility` at the instant the surface is
@@ -193,9 +197,15 @@ and that a `NotAllowedError` falls back to the server frame rather than leaving
 a spinner without re-opening the prompt next time.
 
 **Verified to fail on purpose.** With `onCapturing` stubbed out to a no-op (the
-pre-fix behaviour) the suite reports 5 failures, including the scrim colour and
-the overlay visibility; with the fix in place, 12/12. A test for this that has
+pre-fix behaviour) the suite reports 7 failures, including the scrim colour and
+the overlay visibility; with the fix in place, 20/20. A test for this that has
 never been seen to fail is worth nothing.
+
+Waits are on observed state, never on a sleep: `settle()` polls until the
+dialog has an image, the overlay is visible again and no spinner is left. Every
+frame here costs a CDP screenshot round-trip, so a capture that is instant in a
+real browser takes about five seconds in this harness — a fixed sleep made the
+suite report failures that were really just impatience.
 
 ## Why HD is the default capture
 
@@ -222,3 +232,22 @@ first wherever it exists and keeps the storyboard as the fallback.
 Unsigned frames that are *not* gated, if a better no-prompt fallback is ever
 wanted: `https://i.ytimg.com/vi/<id>/hq1.jpg`, `hq2.jpg`, `hq3.jpg` — real
 frames at roughly 25 %, 50 % and 75 % of the video (verified `200 image/jpeg`).
+
+### Routes that were measured and ruled out
+
+Don't spend another round on these; each was tested against a real feed video,
+not a cached one.
+
+| route | result |
+| --- | --- |
+| `youtubei/v1/player` **from the browser** (`Origin: youtubiy.vercel.app`) | **403** Google abuse page, no `access-control-allow-origin`. The user's own residential IP cannot help: the origin is refused before the IP matters. |
+| `i.ytimg.com/vi/<id>/*.jpg` from the browser | **200**, `access-control-allow-origin: *` — readable into a canvas untainted. Only the poster and `hq1..3` live here, so it cannot give an arbitrary timestamp. |
+| `i.ytimg.com/sb/...` without `sigh` | 403, as before. The signature only comes from the gated player response. |
+| Piped `pipedapi.ducks.party` | 200 for a *cached* `dQw4w9WgXcQ`, **500** for real feed videos. The 200 is the same cache lie that burned round 6. |
+| Piped kavin.rocks / adminforge / drgns / private.coffee | 502 · 403 · NXDOMAIN · DNS timeout |
+| Invidious yewtu.be / nerdvpn / nadeko / ggtyler / f5.si / artemislena | 403 · 403 · 403 · refused · 530 · TLS error |
+
+So there is no server-side or browser-side *data* route to an arbitrary frame.
+The pixels already decoded on the user's screen are the only source, which is
+why screen capture is the primary path and why the dialog now spends words
+explaining the prompt instead of springing it.

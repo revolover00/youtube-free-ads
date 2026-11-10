@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  asCaptureError,
   canShareCapture,
   capture,
   copyCapture,
@@ -52,29 +53,28 @@ interface Props {
  * the compositor, so it cannot be rate-limited or bot-gated, and it is the
  * only path that returns the actual moment on screen.
  *
- * Remembered per browser: dismissing the share prompt turns it off so nobody
- * is nagged twice, and picking "HD" explicitly turns it back on.
- *
- * Versioned, and deliberately bumped: the first release of this path captured
- * the page *including this dialog's own scrim*, so anyone who tried it got a
- * dimmed frame and said no. That "no" was an answer to a broken feature, not
- * to this one, so it does not carry over.
+ * Opening that prompt unannounced is the whole problem: a share-your-screen
+ * request nobody asked for gets dismissed on reflex, and the dismissal used to
+ * be remembered forever, which left the poster as the permanent result. So the
+ * prompt is only opened automatically once it has actually worked in this
+ * browser; before that the dialog explains what is about to happen and waits
+ * for a deliberate click. A refusal is never held against the user.
  */
-const HD_FIRST_KEY = "yt:screenshot-hd-first-v2";
+const HD_OK_KEY = "yt:screenshot-hd-ok";
 
-function prefersHdFirst(): boolean {
+function hdHasWorked(): boolean {
   try {
-    return localStorage.getItem(HD_FIRST_KEY) !== "0";
+    return localStorage.getItem(HD_OK_KEY) === "1";
   } catch {
-    return true;
+    return false;
   }
 }
 
-function setPrefersHdFirst(on: boolean): void {
+function rememberHdWorked(): void {
   try {
-    localStorage.setItem(HD_FIRST_KEY, on ? "1" : "0");
+    localStorage.setItem(HD_OK_KEY, "1");
   } catch {
-    /* private mode — fall back to the in-memory default */
+    /* private mode — just prompt again next time */
   }
 }
 
@@ -101,6 +101,8 @@ export default function ScreenshotDialog({
   const [result, setResult] = useState<CaptureResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  /** Why the screen grab did not happen, shown verbatim so it is diagnosable. */
+  const [hdNotice, setHdNotice] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -137,27 +139,40 @@ export default function ScreenshotDialog({
         },
       };
       try {
-        setResult(await capture(nextTier, opts));
+        const shot = await capture(nextTier, opts);
+        setResult(shot);
+        setHdNotice(null);
+        // Only a real screen grab proves the prompt works here; once it does,
+        // stop making the user ask for it.
+        if (shot.source === "display") rememberHdWorked();
       } catch (e) {
-        const declined = e instanceof DOMException && e.name === "NotAllowedError";
+        const err = asCaptureError(e);
         if (nextTier === "hd") {
-          // Dismissing the share prompt must not leave an empty dialog — drop
-          // to the server frame, and stop opening the prompt automatically.
-          if (declined) setPrefersHdFirst(false);
+          // Say precisely what went wrong. A silent drop to the server frame
+          // is indistinguishable from "the screenshot feature is broken".
+          setHdNotice(
+            err.code === "declined"
+              ? isAr
+                ? "تم إلغاء مشاركة الصفحة، فعُرض الإطار القادم من الخادم بدلًا منها."
+                : "Sharing was cancelled, so the server frame is shown instead."
+              : isAr
+                ? `تعذّرت قراءة الصفحة (${err.message}).`
+                : `Could not read the page (${err.message}).`,
+          );
           setTier("quick");
           try {
             setResult(await capture("quick", opts));
           } catch (inner) {
-            setFailed(inner instanceof Error ? inner.message : String(inner));
+            setFailed(asCaptureError(inner).message);
           }
-        } else if (!declined) {
-          setFailed(e instanceof Error ? e.message : String(e));
+        } else {
+          setFailed(err.message);
         }
       } finally {
         setBusy(false);
       }
     },
-    [videoId, time, title, channel],
+    [videoId, time, title, channel, isAr],
   );
 
   const runRef = useRef(run);
@@ -176,7 +191,8 @@ export default function ScreenshotDialog({
     setResult(null);
     setCopied(false);
     setCaptionCard(false);
-    const startTier: CaptureTier = isHdCaptureSupported() && prefersHdFirst() ? "hd" : "quick";
+    setHdNotice(null);
+    const startTier: CaptureTier = isHdCaptureSupported() && hdHasWorked() ? "hd" : "quick";
     setTier(startTier);
     void runRef.current(startTier, false);
   }, [open]);
@@ -201,10 +217,15 @@ export default function ScreenshotDialog({
 
   const onPickTier = (next: CaptureTier) => {
     if (next === tier || busy) return;
-    // An explicit pick is also a standing preference for the next capture.
-    setPrefersHdFirst(next === "hd");
     setTier(next);
     void run(next, captionCard);
+  };
+
+  /** The one-click path to a true frame, usable even when "HD" is current. */
+  const runHd = () => {
+    if (busy) return;
+    setTier("hd");
+    void run("hd", captionCard);
   };
 
   const onToggleCard = () => {
@@ -288,20 +309,56 @@ export default function ScreenshotDialog({
                     without it a failure is indistinguishable from "this video
                     just has no storyboard". */}
                 {result.note && <span className="block opacity-70">{result.note}</span>}
-                {/* The poster is never what was asked for, so offer the one
-                    path that cannot be refused by YouTube. */}
-                {hdAvailable && (
-                  <button
-                    type="button"
-                    onClick={() => onPickTier("hd")}
-                    disabled={busy}
-                    className="mt-2 inline-flex h-8 items-center gap-1.5 rounded-full bg-[#ffd95c] px-3 text-[13px] font-medium text-[#3a2e00] hover:bg-[#ffe484] disabled:opacity-50"
-                  >
-                    <Camera className="h-4 w-4" />
-                    {isAr ? "التقط الإطار الحقيقي" : "Capture the real frame"}
-                  </button>
-                )}
               </span>
+            </div>
+          )}
+
+          {/* The user shared a whole screen or window, so the frame is not the
+              player. Saying so beats handing them their desktop in silence. */}
+          {result?.source === "display" && result.cropped === false && (
+            <div className="mt-2.5 flex items-start gap-2 rounded-lg bg-[#3a2e00] px-3 py-2 text-[13px] leading-[18px] text-[#ffd95c]">
+              <AlertTriangle className="mt-px h-4 w-4 shrink-0" />
+              <span className="min-w-0">
+                {isAr
+                  ? "شاركت شاشة أو نافذة كاملة، فاللقطة هي كل ما شاركته. اختر «علامة التبويب هذه» للحصول على الفيديو وحده."
+                  : "You shared a whole screen or window, so this is all of it. Choose “This tab” to get just the video."}
+              </span>
+            </div>
+          )}
+
+          {/*
+            Everything except a real screen grab is a guess at the moment the
+            user is looking at: the server storyboard is the right frame only
+            when YouTube answers us at all, and the poster never is. So
+            whenever the image on screen is not a true capture, offer the one
+            path that always is — and say plainly what the browser will ask,
+            because an unexplained "share your screen" prompt gets dismissed on
+            reflex and that dismissal is what made this look broken.
+          */}
+          {hdAvailable && result?.source !== "display" && (
+            <div className="mt-2.5 rounded-lg bg-yt-surface px-3 py-2.5">
+              <p className="text-[13px] font-medium leading-[18px] text-yt-text">
+                {isAr
+                  ? "عايز الإطار اللي واقف عنده بالظبط؟"
+                  : "Want the exact frame you are paused on?"}
+              </p>
+              <p className="mt-1 text-[12px] leading-[17px] text-yt-sub">
+                {isAr
+                  ? "اضغط الزر، وهيظهر طلب من المتصفح: اختر «علامة التبويب هذه» ثم «مشاركة». تُقرأ لقطة واحدة وتتوقف المشاركة فورًا — لا يُسجَّل أي شيء."
+                  : "Press the button and the browser will ask: choose “This tab”, then “Share”. One frame is read and sharing stops immediately — nothing is recorded."}
+              </p>
+              <button
+                type="button"
+                onClick={runHd}
+                disabled={busy}
+                className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-full bg-yt-text px-4 text-[13px] font-medium text-yt-bg hover:bg-white disabled:opacity-50"
+              >
+                <Camera className="h-4 w-4" />
+                {isAr ? "التقط الإطار الحقيقي" : "Capture the real frame"}
+              </button>
+              {hdNotice && (
+                <p className="mt-2 text-[12px] leading-[17px] text-[#ff8a80]">{hdNotice}</p>
+              )}
             </div>
           )}
 

@@ -32,7 +32,7 @@ import chromium from "@sparticuz/chromium";
 
 const BASE = process.env.BASE_URL ?? "http://127.0.0.1:3000";
 const VIDEO = "dQw4w9WgXcQ";
-const HD_KEY = "yt:screenshot-hd-first-v2";
+const HD_OK_KEY = "yt:screenshot-hd-ok";
 
 const VIEWPORT = { width: 1440, height: 900, deviceScaleFactor: 2 };
 /** Painted into the real player box so the crop can be identified by colour. */
@@ -161,8 +161,35 @@ async function previewCentre(page) {
   });
 }
 
-async function openDialog(page, key) {
-  await page.evaluate((k) => localStorage.setItem(k, "1"), key);
+/**
+ * Wait for a capture to finish rather than sleeping a guessed interval: in
+ * this harness every frame costs a CDP screenshot round-trip, so a capture
+ * that is instant in a real browser takes seconds here.
+ */
+async function settle(page, { timeout = 30000 } = {}) {
+  const deadline = Date.now() + timeout;
+  for (;;) {
+    const state = await page.evaluate(() => {
+      const dialog = document.querySelector('[role="dialog"]');
+      const overlay = document.querySelector("[data-screenshot-overlay]");
+      return {
+        hasImage: !!dialog?.querySelector("img"),
+        spinning: !!dialog?.querySelector(".animate-spin"),
+        visible: overlay ? getComputedStyle(overlay).visibility === "visible" : false,
+      };
+    });
+    if (state.hasImage && state.visible && !state.spinning) return;
+    if (Date.now() > deadline) throw new Error(`capture never settled: ${JSON.stringify(state)}`);
+    await new Promise((r) => setTimeout(r, 250));
+  }
+}
+
+async function openDialog(page, { proven }) {
+  await page.evaluate(
+    (k, isProven) => (isProven ? localStorage.setItem(k, "1") : localStorage.removeItem(k)),
+    "yt:screenshot-hd-ok",
+    proven,
+  );
   const opened = await page.evaluate(() => {
     const btn = [...document.querySelectorAll("button")].find((b) =>
       /screenshot|لقطة/i.test(b.getAttribute("title") ?? ""),
@@ -173,11 +200,41 @@ async function openDialog(page, key) {
   });
   if (!opened) throw new Error("screenshot button not found");
   await page.waitForSelector('[role="dialog"] img', { timeout: 20000 });
-  await new Promise((r) => setTimeout(r, 400));
+  await settle(page);
 }
+
+/** The explained one-click path shown whenever the image is not a real grab. */
+async function clickCaptureCta(page) {
+  const clicked = await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('[role="dialog"] button')].find((b) =>
+      /capture the real frame|التقط الإطار الحقيقي/i.test(b.textContent ?? ""),
+    );
+    if (!btn) return false;
+    btn.click();
+    return true;
+  });
+  if (!clicked) throw new Error("capture CTA not found");
+  await settle(page);
+}
+
+const ctaPresent = (page) =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('[role="dialog"] button')].some((b) =>
+      /capture the real frame|التقط الإطار الحقيقي/i.test(b.textContent ?? ""),
+    ),
+  );
 
 async function newWatchPage() {
   const page = await browser.newPage();
+  page.on("pageerror", (e) => console.error(`  [page error] ${e.message}`));
+  page.on("console", (m) => {
+    // Offline fixtures cannot load thumbnails or the YouTube embed; that noise
+    // is expected and would bury a real error.
+    const text = m.text();
+    if (m.type() === "error" && !/Failed to load resource/.test(text)) {
+      console.error(`  [console] ${text.slice(0, 200)}`);
+    }
+  });
   await page.setViewport(VIEWPORT);
   await page.goto(`${BASE}/watch?v=${VIDEO}`, { waitUntil: "networkidle2", timeout: 60000 });
   await page.waitForSelector("#persistent-player", { timeout: 20000 });
@@ -197,7 +254,7 @@ try {
   let page = await newWatchPage();
   await markPlayer(page);
   await installPageSurface(page);
-  await openDialog(page, HD_KEY);
+  await openDialog(page, { proven: true });
 
   const hd = await previewCentre(page);
   check("preview rendered", hd !== null, true);
@@ -246,7 +303,7 @@ try {
   page = await newWatchPage();
   await markPlayer(page);
   await installPageSurface(page, { reject: true });
-  await openDialog(page, HD_KEY);
+  await openDialog(page, { proven: true });
 
   const fallback = await previewCentre(page);
   check("fallback preview rendered instead of an endless spinner", fallback !== null, true);
@@ -264,10 +321,49 @@ try {
     "visible",
   );
   check(
-    "prompt is not re-opened automatically next time",
-    await page.evaluate((k) => localStorage.getItem(k), HD_KEY),
-    "0",
+    "the refusal is explained rather than silently swallowed",
+    await page.evaluate(() => {
+      const el = document.querySelector('[role="dialog"]');
+      return /cancelled|أُلغيت|تم إلغاء/i.test(el?.textContent ?? "");
+    }),
+    true,
   );
+  check("the one-click retry is still offered after a refusal", await ctaPresent(page), true);
+  await page.close();
+
+  // ---- 3. A first-time browser is never prompted unannounced -------------
+  console.log("\nfirst visit explains itself instead of ambushing the user");
+  page = await newWatchPage();
+  await markPlayer(page);
+  await installPageSurface(page);
+  await openDialog(page, { proven: false });
+
+  check(
+    "no share prompt is opened on its own the first time",
+    await page.evaluate(() => window.__overlayAtCapture),
+    "never-called",
+  );
+  check("the explained capture button is offered instead", await ctaPresent(page), true);
+  check(
+    "nothing is remembered before it has ever worked",
+    await page.evaluate((k) => localStorage.getItem(k), HD_OK_KEY),
+    null,
+  );
+
+  await clickCaptureCta(page);
+  const viaCta = await previewCentre(page);
+  check("the button produces a real capture", near(viaCta?.rgb, PLAYER_RGB), true);
+  check(
+    "the dialog stayed out of that shot too",
+    await page.evaluate(() => window.__overlayAtCapture),
+    "hidden",
+  );
+  check(
+    "a working capture is remembered, so later opens go straight through",
+    await page.evaluate((k) => localStorage.getItem(k), HD_OK_KEY),
+    "1",
+  );
+  check("the prompt offer disappears once the image is a real grab", await ctaPresent(page), false);
   await page.close();
 } finally {
   await browser.close();

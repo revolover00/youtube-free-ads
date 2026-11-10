@@ -70,6 +70,33 @@ export interface CaptureResult {
   nativeHeight: number;
   /** Why a poster was substituted for the real frame, when that happened. */
   note?: string;
+  /** What the user actually shared: "browser" (a tab), "window", "monitor". */
+  surface?: string;
+  /** False when the frame is the whole shared surface rather than the player. */
+  cropped?: boolean;
+}
+
+/** Why a capture could not be produced, in terms the UI can act on. */
+export type CaptureFailureCode = "declined" | "unsupported" | "no-track" | "failed";
+
+export class CaptureError extends Error {
+  readonly code: CaptureFailureCode;
+  constructor(code: CaptureFailureCode, message: string) {
+    super(message);
+    this.name = "CaptureError";
+    this.code = code;
+  }
+}
+
+/** Normalise anything thrown by the capture pipeline into a CaptureError. */
+export function asCaptureError(e: unknown): CaptureError {
+  if (e instanceof CaptureError) return e;
+  if (e instanceof DOMException) {
+    // The user closed the picker, or the browser refused outright.
+    if (e.name === "NotAllowedError") return new CaptureError("declined", e.message);
+    return new CaptureError("failed", `${e.name}: ${e.message}`);
+  }
+  return new CaptureError("failed", e instanceof Error ? e.message : String(e));
 }
 
 const TARGET_WIDTH = 1280;
@@ -263,8 +290,40 @@ function presentedFrame(video: HTMLVideoElement): Promise<void> {
  * tab where the browser supports `preferCurrentTab`). The track is stopped the
  * moment a single frame has been read.
  */
+/**
+ * A frame with no tonal range at all is the capture pipeline not having caught
+ * up — the surface opens before it has composited anything. Worth one more
+ * frame rather than handing the user a black rectangle.
+ */
+function frameLooksBlank(
+  video: HTMLVideoElement,
+  crop: { x: number; y: number; width: number; height: number },
+): boolean {
+  const probe = document.createElement("canvas");
+  probe.width = 32;
+  probe.height = 18;
+  const ctx = probe.getContext("2d");
+  if (!ctx) return false;
+  try {
+    ctx.drawImage(video, crop.x, crop.y, crop.width, crop.height, 0, 0, 32, 18);
+    const d = ctx.getImageData(0, 0, 32, 18).data;
+    let min = 255;
+    let max = 0;
+    for (let i = 0; i < d.length; i += 4) {
+      const l = ((d[i] ?? 0) + (d[i + 1] ?? 0) + (d[i + 2] ?? 0)) / 3;
+      if (l < min) min = l;
+      if (l > max) max = l;
+    }
+    return max - min < 6;
+  } catch {
+    return false;
+  }
+}
+
 async function captureHd(opts: CaptureOptions): Promise<CaptureResult> {
-  if (!isHdCaptureSupported()) throw new Error("display capture unsupported");
+  if (!isHdCaptureSupported()) {
+    throw new CaptureError("unsupported", "this browser cannot capture the screen");
+  }
 
   const constraints: DisplayMediaConstraints = {
     preferCurrentTab: true,
@@ -282,12 +341,12 @@ async function captureHd(opts: CaptureOptions): Promise<CaptureResult> {
     stream = await navigator.mediaDevices.getDisplayMedia(constraints);
   } catch (e) {
     opts.onCapturing?.(false);
-    throw e;
+    throw asCaptureError(e);
   }
 
   try {
     const track = stream.getVideoTracks()[0];
-    if (!track) throw new Error("no video track in the shared surface");
+    if (!track) throw new CaptureError("no-track", "the shared surface has no video track");
 
     const video = document.createElement("video");
     video.srcObject = stream;
@@ -307,6 +366,7 @@ async function captureHd(opts: CaptureOptions): Promise<CaptureResult> {
     const surface = (track.getSettings() as MediaTrackSettings & { displaySurface?: string })
       .displaySurface;
     let crop = { x: 0, y: 0, width, height };
+    let cropped = false;
 
     if (surface === "browser" && opts.cropSelector) {
       const el = document.querySelector(opts.cropSelector);
@@ -321,18 +381,36 @@ async function captureHd(opts: CaptureOptions): Promise<CaptureResult> {
           width: Math.min(width - x, Math.round(r.width * scale)),
           height: Math.min(height - y, Math.round(r.height * scale)),
         };
+        cropped = true;
       }
     }
+
+    // The first frame off a freshly opened surface is routinely empty. Spend
+    // a few frames waiting rather than returning a black rectangle.
+    for (let i = 0; i < 5 && frameLooksBlank(video, crop); i += 1) {
+      await presentedFrame(video);
+    }
+
+    const note = !cropped
+      ? surface === "browser"
+        ? "Could not locate the player on the page, so this is the whole tab."
+        : "You shared a whole screen or window, so this is everything that was shared. Choose the tab itself for just the video."
+      : undefined;
 
     const result = await compose(video, crop, opts, {
       // The frame on the compositor is the one from *now*, which is seconds
       // after the dialog was opened if the prompt sat waiting.
       at: opts.getTime?.() ?? opts.time,
       source: "display",
+      ...(note ? { note } : {}),
     });
     video.pause();
     video.srcObject = null;
-    return result;
+    return {
+      ...result,
+      cropped,
+      ...(surface ? { surface } : {}),
+    };
   } finally {
     stream.getTracks().forEach((t) => t.stop());
     opts.onCapturing?.(false);
