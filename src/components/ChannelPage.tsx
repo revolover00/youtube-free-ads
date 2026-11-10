@@ -267,7 +267,7 @@ export default function ChannelPage({
                   <div className="relative aspect-video rounded-xl overflow-hidden bg-yt-raised">
                     <img
                       src={featured.thumbnail}
-                      alt={featured.title}
+                      alt=""
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
@@ -304,7 +304,7 @@ export default function ChannelPage({
                       <div className="relative aspect-[9/16] rounded-xl overflow-hidden bg-yt-raised">
                         <img
                           src={s.thumbnail}
-                          alt={s.title}
+                          alt=""
                           referrerPolicy="no-referrer"
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         />
@@ -348,7 +348,7 @@ export default function ChannelPage({
                   <div className="relative aspect-[9/16] rounded-xl overflow-hidden bg-yt-raised">
                     <img
                       src={s.thumbnail}
-                      alt={s.title}
+                      alt=""
                       referrerPolicy="no-referrer"
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />

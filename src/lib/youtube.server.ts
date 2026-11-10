@@ -6,6 +6,7 @@
  * to YouTube's own public InnerTube endpoint directly.
  */
 
+import { USE_FIXTURE, fixtureVideoDetails, fixtureVideos } from "./fixtures";
 import type {
   ChannelData,
   PipedComment,
@@ -588,7 +589,9 @@ function interleave(lists: PipedVideo[][]): PipedVideo[] {
  * the hot list is rebuilt from most-viewed uploads of the last week.
  * `cursors` (from a previous page) fetches the next page of every source.
  */
+
 export async function trendingPage(cursors?: (string | null)[]): Promise<TrendingPage> {
+  if (USE_FIXTURE) return { items: fixtureVideos(24), cursors: [null] };
   const key = `trendingPage:${JSON.stringify(cursors ?? null)}`;
   return cached(key, 10 * 60 * 1000, async () => {
     const batches = await Promise.allSettled(

@@ -221,7 +221,7 @@ function QueuePanel({ onOpen }: { onOpen: (v: PipedVideo) => void }) {
                   <div className="relative w-16 aspect-video rounded overflow-hidden bg-black shrink-0">
                     <img
                       src={item.thumbnail || `https://i.ytimg.com/vi/${id}/mqdefault.jpg`}
-                      alt={item.title}
+                      alt=""
                       className="w-full h-full object-cover"
                     />
                     {item.duration > 0 && (
@@ -297,7 +297,10 @@ export default function Watch({
   const [disliked, setDisliked] = useState(false);
   const [mobileCommentsOpen, setMobileCommentsOpen] = useState(false);
   const [showInlineComments, setShowInlineComments] = useState(false);
-  const [chaptersCollapsed, setChaptersCollapsed] = useState(false);
+  // Collapsed by default: YouTube keeps chapters tucked into the description
+  // and under the scrubber, never as an expanded ~200px list pushing the
+  // description and comments below the fold.
+  const [chaptersCollapsed, setChaptersCollapsed] = useState(true);
 
   // Theater Mode State (persisted in localStorage key 'yt.theater')
   const [theater, setTheater] = useState(() => {
@@ -1420,7 +1423,7 @@ export default function Watch({
               key={r.url}
               video={r}
               index={i}
-              layout={theater ? "grid" : "list"}
+              layout={theater ? "grid" : "compact"}
               onOpen={onOpen}
               onChannel={onChannel}
               notify={notify}
@@ -1561,7 +1564,9 @@ function CommentRow({
             className="flex items-center gap-1.5 text-xs hover:text-yt-text"
           >
             <ThumbsUp className={`w-4 h-4 ${liked ? "fill-current text-yt-blue pop" : ""}`} />
-            {c.likeCount + (liked ? 1 : 0)}
+            {/* Compact-formatted like every other count on the site — this was
+                printing the raw integer (e.g. "48211" instead of "48K"). */}
+            {fmtViews(c.likeCount + (liked ? 1 : 0)) || null}
           </button>
           <button className="hover:text-yt-text" aria-label={t("dislike")}>
             <ThumbsDown className="w-4 h-4" />

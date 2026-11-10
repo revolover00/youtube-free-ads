@@ -174,7 +174,7 @@ function ShortItem({
             title={video.title}
           />
         ) : (
-          <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover" />
+          <img src={video.thumbnail} alt="" className="w-full h-full object-cover" />
         )}
         <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none" />
 

@@ -297,7 +297,7 @@ export function VideoCard({
   onSaveLater?: () => void;
   onAddToPlaylist?: (v: PipedVideo) => void;
   saved?: boolean;
-  layout?: "grid" | "list";
+  layout?: "grid" | "list" | "compact";
 }) {
   const { lang, t } = useLanguage();
   const id = videoIdFromUrl(video.url);
@@ -376,7 +376,12 @@ export function VideoCard({
         src={thumbSrc}
         srcSet={srcSet}
         sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-        alt={video.title}
+        /*
+          Decorative: the title is rendered as text right below this image, so
+          a duplicate alt would be announced twice and a failed load would
+          paint the whole title across the thumbnail.
+        */
+        alt=""
         loading={index < 4 ? "eager" : "lazy"}
         fetchPriority={index < 4 ? "high" : "low"}
         decoding="async"
@@ -427,6 +432,50 @@ export function VideoCard({
       )}
     </div>
   );
+
+  // YouTube's "compact" renderer — the one in the watch page's right rail.
+  // It is a genuinely different component from the wide list row: a fixed
+  // 168px thumbnail, 14px title and 12px metadata, and no channel avatar.
+  // The wide `list` layout cannot stand in for it, because its `sm:w-64`
+  // thumbnail is a *viewport* breakpoint and so stayed 256px wide inside the
+  // 402px rail, starving the title column down to ~130px.
+  if (layout === "compact") {
+    return (
+      <article
+        ref={cardRef}
+        onMouseEnter={handlePrefetch}
+        className="rise group flex cursor-pointer gap-2"
+        style={{ contentVisibility: "auto", containIntrinsicSize: "0 94px" }}
+        onClick={() => onOpen(video)}
+      >
+        <div className="w-[168px] shrink-0">{thumb}</div>
+        <div className="min-w-0 flex-1">
+          <h3
+            className={`line-clamp-2 text-sm font-medium leading-5 ${
+              isWatched ? "opacity-60" : ""
+            }`}
+          >
+            {video.title}
+          </h3>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onChannel?.(video.uploaderUrl || "", video.uploaderName);
+            }}
+            className="mt-1 flex max-w-full items-center gap-1 text-xs leading-[18px] text-yt-sub hover:text-yt-text"
+          >
+            <span className="truncate">{video.uploaderName}</span>
+            {video.uploaderVerified && <BadgeCheck className="h-3 w-3 shrink-0 text-yt-sub" />}
+          </button>
+          <div className="text-xs leading-[18px] text-yt-sub">
+            {fmtViews(video.views, lang) && `${fmtViews(video.views, lang)} ${t("views")} · `}
+            {timeAgo(video.uploaded, video.uploadedDate, lang)}
+          </div>
+        </div>
+        <div className="self-start">{menu}</div>
+      </article>
+    );
+  }
 
   if (layout === "list") {
     return (
@@ -597,7 +646,7 @@ export function PlaylistCard({
         {playlist.thumbnail ? (
           <img
             src={playlist.thumbnail}
-            alt={playlist.title}
+            alt=""
             loading="lazy"
             referrerPolicy="no-referrer"
             className="w-full h-full object-cover"
@@ -630,7 +679,11 @@ export function ShortsShelf({
   if (!items.length) return null;
 
   return (
-    <section id="shorts-shelf" className="rise my-8 py-4 border-y border-yt-border">
+    <section
+      id="shorts-shelf"
+      /* Full-width child of the feed grid, so it breaks the row cleanly. */
+      className="rise col-span-full my-2 py-4 border-y border-yt-border"
+    >
       <div className="flex items-center gap-2.5 mb-4 px-0.5">
         <ShortsIcon className="w-7 h-7 text-yt-red" />
         <h2 className="font-bold text-xl">{t("shorts")}</h2>
@@ -645,7 +698,7 @@ export function ShortsShelf({
             <div className="relative aspect-[9/16] rounded-xl overflow-hidden bg-yt-raised">
               <img
                 src={s.thumbnail}
-                alt={s.title}
+                alt=""
                 loading="lazy"
                 referrerPolicy="no-referrer"
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
@@ -694,11 +747,15 @@ export function ErrorState({ message, onRetry }: { message?: string; onRetry: ()
       <div className="w-20 h-20 rounded-full bg-yt-surface grid place-items-center mb-5">
         <AlertTriangle className="w-9 h-9 text-red-400" />
       </div>
-      <h3 className="font-bold text-lg">{t("loadError")}</h3>
-      <p className="text-yt-sub text-sm mt-1 max-w-sm">{message || t("loadError")}</p>
+      <h3 className="text-lg font-medium">{t("loadError")}</h3>
+      {/* Only show the detail line when it actually says something new —
+          falling back to t("loadError") printed the heading twice. */}
+      {message && message !== t("loadError") && (
+        <p className="mt-1 max-w-sm text-sm text-yt-sub">{message}</p>
+      )}
       <button
         onClick={onRetry}
-        className="mt-5 h-10 px-6 rounded-full bg-yt-text text-yt-bg font-bold text-sm flex items-center gap-2 hover:bg-white/85 transition-all"
+        className="mt-5 flex h-10 items-center gap-2 rounded-full bg-yt-text px-6 text-sm font-medium text-yt-bg hover:bg-white/85"
       >
         <RefreshCw className="w-4 h-4" /> {t("retry")}
       </button>

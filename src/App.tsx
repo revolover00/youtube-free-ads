@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import type { RefObject } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   useInfiniteQuery,
@@ -129,6 +138,33 @@ const LIBRARY_KEYS: LibraryKey[] = [
   "الرياضة",
   "Sports",
 ];
+
+/**
+ * Live column count of a CSS grid that uses `repeat(auto-fill, ...)`.
+ *
+ * The track count is decided by the browser, so it can only be read back off
+ * the computed style. Kept in sync with a ResizeObserver so the Shorts shelf
+ * stays on a row boundary while the window is being resized.
+ */
+function useGridColumns(ref: RefObject<HTMLDivElement | null>): number {
+  const [columns, setColumns] = useState(4);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const read = () => {
+      const tracks = getComputedStyle(el).gridTemplateColumns;
+      const n = tracks.split(" ").filter((t) => t.trim() !== "" && t !== "none").length;
+      if (n > 0) setColumns(n);
+    };
+    read();
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref]);
+
+  return columns;
+}
 
 export default function App() {
   const { lang, t, isAr } = useLanguage();
@@ -865,6 +901,8 @@ export default function App() {
   } | null>(null);
   const countdownTimerRef = useRef<number | null>(null);
 
+  const feedGridRef = useRef<HTMLDivElement>(null);
+
   const shortsItems = useMemo(
     () => (feed || []).filter((v) => isShortsVideo(v)).slice(0, 10),
     [feed],
@@ -1326,8 +1364,11 @@ export default function App() {
     };
   };
 
-  const first = filteredVideos.slice(0, 4);
-  const rest = filteredVideos.slice(4);
+  // YouTube drops the Shorts shelf in after a complete row of videos. The
+  // column count comes from `auto-fill`, so it has to be measured instead of
+  // assumed; a hardcoded 4 only lined up on a 4-column viewport.
+  const feedColumns = useGridColumns(feedGridRef);
+  const shortsShelfIndex = Math.min(feedColumns, filteredVideos.length);
 
   // Search filter chips definition requested by the user:
   // "All", "Shorts", "Unwatched", "Watched", "Videos", "Recently uploaded", "Live"
@@ -1691,20 +1732,26 @@ export default function App() {
                   </div>
                 )}
 
-                <div className="yt-grid mt-2">
-                  {first.map((v, i) => (
-                    <VideoCard key={v.url} {...cardProps(v, i)} />
-                  ))}
-                </div>
-                {showShorts && (
-                  <ShortsShelf
-                    items={shortsItems}
-                    onOpen={(i) => setShorts({ items: shortsItems, index: i })}
-                  />
-                )}
-                <div className="yt-grid">
-                  {rest.map((v, i) => (
-                    <VideoCard key={v.url} {...cardProps(v, i + 4)} />
+                {/*
+                  One single grid for the whole feed. Rendering the pre-shelf
+                  and post-shelf videos as two separate grids used to restart
+                  auto-placement, so a 4-item first batch left a hole in every
+                  layout that is not exactly 4 columns wide (at 1920px/5 cols
+                  the first row showed 4 cards and one empty cell). The shelf
+                  is now a full-width child, and the split index is a whole
+                  number of rows, so the rhythm never breaks.
+                */}
+                <div ref={feedGridRef} className="yt-grid mt-2">
+                  {filteredVideos.map((v, i) => (
+                    <Fragment key={v.url}>
+                      {showShorts && i === shortsShelfIndex && (
+                        <ShortsShelf
+                          items={shortsItems}
+                          onOpen={(i2) => setShorts({ items: shortsItems, index: i2 })}
+                        />
+                      )}
+                      <VideoCard {...cardProps(v, i)} />
+                    </Fragment>
                   ))}
                 </div>
 
@@ -1929,7 +1976,7 @@ export default function App() {
                     autoplayCountdown.nextVideo.thumbnail ||
                     `https://i.ytimg.com/vi/${videoIdFromUrl(autoplayCountdown.nextVideo.url)}/mqdefault.jpg`
                   }
-                  alt={autoplayCountdown.nextVideo.title}
+                  alt=""
                   className="w-20 aspect-video rounded object-cover shrink-0"
                 />
                 <div className="min-w-0 flex-1">
@@ -1993,7 +2040,12 @@ export default function App() {
       />
 
       {/* Debug Panel */}
-      <DebugPanel />
+      {/*
+        Developer tool. It renders a floating button with an unread badge over
+        the bottom-right of every page, which is not something YouTube has and
+        not something a visitor should ever see. Dev builds only.
+      */}
+      {import.meta.env.DEV && <DebugPanel />}
     </div>
   );
 }
