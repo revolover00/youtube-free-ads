@@ -8,27 +8,22 @@
  *     Chrome on Android, not Safari on iOS, not Samsung Internet.
  *   - Every InnerTube client (WEB, MWEB, ANDROID, ANDROID_VR, IOS, the TV and
  *     embedded players) answers a datacentre IP with "Sign in to confirm
- *     you're not a bot", so the server can no longer read a storyboard spec.
+ *     you're not a bot", so the server cannot read a storyboard spec.
  *   - Storyboard sheets on i.ytimg.com are 403 without the signature that
  *     only that spec carries.
  *   - The player is a cross-origin iframe, so its pixels are unreadable from
  *     JavaScript, and the muxed streams are signature-locked.
  *
- * What remains is the screenshot button already built into the phone. The
- * work here is to make what it photographs as sharp as the video actually
- * allows — which is a question of resolution, not of screen area.
+ * So the phone's own screenshot is the capture, and everything here exists to
+ * make what it photographs worth keeping: no player chrome over the frame, no
+ * upscaling, and the real moment.
  */
 
 const ATTR = "data-shot-mode";
 const LAYER_ID = "yt-shot-layer";
 const CARD_ID = "yt-shot-card";
 const BACKDROP_ID = "yt-shot-backdrop";
-
-/** The YouTube embed takes commands over postMessage; this is how Watch.tsx drives it. */
-function commandPlayer(func: string, args: unknown[] = []): void {
-  const iframe = document.querySelector("#persistent-player iframe") as HTMLIFrameElement | null;
-  iframe?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), "*");
-}
+const STAGE_ID = "yt-shot-stage";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -45,17 +40,19 @@ const QUALITY_LINES: Record<string, number> = {
   highres: 2160,
 };
 
-interface PlayerInfo {
-  currentTime?: number;
-  playbackQuality?: string;
-  availableQualityLevels?: string[];
+/**
+ * Assumed when the player never reports a quality. Guessing low and
+ * downscaling stays sharp; guessing high and upscaling is the exact defect
+ * this module keeps being blamed for.
+ */
+const ASSUMED_LINES = 720;
+
+function send(target: Window | null | undefined, event: string, extra: object = {}): void {
+  target?.postMessage(JSON.stringify({ event, ...extra }), "*");
 }
 
-/** YouTubePlayer.tsx already re-broadcasts every infoDelivery payload. */
-function watchPlayerInfo(onInfo: (info: PlayerInfo) => void): () => void {
-  const handler = (e: Event) => onInfo((e as CustomEvent<PlayerInfo>).detail ?? {});
-  window.addEventListener("yt:player-info", handler);
-  return () => window.removeEventListener("yt:player-info", handler);
+function command(target: Window | null | undefined, func: string, args: unknown[] = []): void {
+  send(target, "command", { func, args });
 }
 
 export function isShotModeActive(): boolean {
@@ -67,8 +64,7 @@ export function exitShotMode(): void {
   document.documentElement.removeAttribute(ATTR);
   document.documentElement.style.removeProperty("--yt-shot-w");
   document.documentElement.style.removeProperty("--yt-shot-h");
-  document.getElementById(LAYER_ID)?.remove();
-  document.getElementById(BACKDROP_ID)?.remove();
+  [LAYER_ID, BACKDROP_ID, STAGE_ID].forEach((id) => document.getElementById(id)?.remove());
   if (document.fullscreenElement) {
     void document.exitFullscreen?.().catch(() => {
       /* already gone */
@@ -77,12 +73,12 @@ export function exitShotMode(): void {
 }
 
 /**
- * Size the player so one video pixel lands on one device pixel.
+ * Size the stage so one video pixel lands on one device pixel.
  *
  * Stretching a 720p video across a 2400px-wide landscape screen does not add
- * detail, it just interpolates — which is exactly what "the quality is
- * rubbish" looks like. Rendering at the source's own resolution (or smaller,
- * when the screen is smaller) is the sharpest a screenshot can possibly be.
+ * detail, it interpolates — which is what "the quality is rubbish" looks
+ * like. Rendering at the source's own resolution, or smaller when the screen
+ * is smaller, is the sharpest a screenshot can be.
  *
  * @returns the device-pixel size the frame will occupy in the screenshot.
  */
@@ -92,9 +88,7 @@ export function sizeToNative(lines: number): { width: number; height: number } {
   let w = (h * 16) / 9;
 
   // Never grow past the screen; downscaling stays sharp, upscaling does not.
-  const maxW = window.innerWidth;
-  const maxH = window.innerHeight;
-  const shrink = Math.min(1, maxW / w, maxH / h);
+  const shrink = Math.min(1, window.innerWidth / w, window.innerHeight / h);
   w *= shrink;
   h *= shrink;
 
@@ -104,9 +98,8 @@ export function sizeToNative(lines: number): { width: number; height: number } {
 }
 
 /**
- * A 16:9 video inside a portrait phone only gets about a quarter of the
- * screen. Landscape leaves room to show it at full resolution rather than a
- * downscaled slice, so it is worth asking for.
+ * A 16:9 video in a portrait phone has no room to be shown at full size.
+ * Landscape does, so it is worth asking for.
  */
 async function faceLandscape(): Promise<boolean> {
   try {
@@ -121,36 +114,89 @@ async function faceLandscape(): Promise<boolean> {
   }
 }
 
-function isPortrait(): boolean {
-  return window.innerHeight > window.innerWidth;
-}
+const isPortrait = () => window.innerHeight > window.innerWidth;
 
 /**
- * Swap the text without remounting, so each stage can report itself in place
- * and only the final message starts counting down to invisibility.
+ * Swap the text without remounting, so each stage reports itself in place and
+ * only the final message counts down to invisibility.
  */
 function setLayerMessage(message: string, { fade } = { fade: true }): void {
   const card = document.getElementById(CARD_ID);
   if (!card) return;
   card.textContent = message;
   if (!fade) return;
-  // Long enough to read, short enough that nobody is still waiting for it.
   window.setTimeout(() => {
     card.style.opacity = "0";
-  }, 3000);
+  }, 3200);
+}
+
+/**
+ * A second, deliberately bare player.
+ *
+ * The page's own embed runs with `controls=1`, and a paused YouTube embed
+ * draws its control bar, its progress bar and a large play button straight
+ * over the frame — all of which land in the screenshot. Those are iframe
+ * parameters, so they cannot be turned off after load; the only way to a
+ * clean frame is a player that never had them. It starts shortly before the
+ * moment and plays into it, because seeking makes YouTube refill its buffer
+ * from a low-quality segment and pausing right after freezes exactly that.
+ */
+function mountStage(videoId: string, at: number): HTMLIFrameElement {
+  const stage = document.createElement("div");
+  stage.id = STAGE_ID;
+
+  const params = new URLSearchParams({
+    autoplay: "1",
+    mute: "1",
+    controls: "0",
+    playsinline: "1",
+    rel: "0",
+    modestbranding: "1",
+    iv_load_policy: "3",
+    disablekb: "1",
+    fs: "0",
+    enablejsapi: "1",
+    origin: window.location.origin,
+    start: String(Math.max(0, Math.floor(at - 2))),
+    vq: "hd1080",
+  });
+
+  const frame = document.createElement("iframe");
+  frame.allow = "autoplay; encrypted-media";
+  frame.setAttribute("frameborder", "0");
+  frame.src = `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+  Object.assign(frame.style, {
+    width: "100%",
+    height: "100%",
+    border: "0",
+    display: "block",
+  } satisfies Partial<CSSStyleDeclaration>);
+  frame.addEventListener("load", () => {
+    send(frame.contentWindow, "listening", { id: 1, channel: "widget" });
+    command(frame.contentWindow, "setPlaybackQuality", ["highres"]);
+  });
+
+  stage.appendChild(frame);
+  document.body.appendChild(stage);
+  return frame;
+}
+
+export interface ShotCopy {
+  /** Shown while the frame is being brought up to its best resolution. */
+  preparing: string;
+  /** Built once the real resolution is known. */
+  ready: (size: string) => string;
+  /** Appended when the phone is still portrait and could not be turned. */
+  rotate: string;
+  dir: "rtl" | "ltr";
 }
 
 /**
  * The instruction has to be read and then be gone, because anything still on
- * screen lands in the user's photo. It leaves behind an invisible catcher so
- * a tap anywhere returns to the app.
+ * screen lands in the photo. It leaves an invisible catcher behind so a tap
+ * anywhere returns to the app.
  */
-function mountLayer(message: string, dir: "rtl" | "ltr"): void {
-  document.getElementById(LAYER_ID)?.remove();
-  document.getElementById(BACKDROP_ID)?.remove();
-
-  // The player no longer covers the whole screen once it is sized to the
-  // video's own resolution, so the rest of the app needs hiding behind this.
+function mountChrome(message: string, dir: "rtl" | "ltr"): void {
   const backdrop = document.createElement("div");
   backdrop.id = BACKDROP_ID;
   Object.assign(backdrop.style, {
@@ -197,73 +243,66 @@ function mountLayer(message: string, dir: "rtl" | "ltr"): void {
   document.body.appendChild(layer);
 }
 
-export interface ShotCopy {
-  /** Shown while the player is being pushed up to its best resolution. */
-  preparing: string;
-  /** Built once the real resolution is known. */
-  ready: (size: string) => string;
-  /** Appended when the phone is still portrait and could not be turned. */
-  rotate: string;
-  dir: "rtl" | "ltr";
-}
-
 /**
  * @param at seconds to land on — the moment the user actually asked for.
  */
-export async function enterShotMode(at: number, copy: ShotCopy): Promise<void> {
+export async function enterShotMode(videoId: string, at: number, copy: ShotCopy): Promise<void> {
   if (typeof document === "undefined") return;
 
-  document.documentElement.setAttribute(ATTR, "");
-  mountLayer(copy.preparing, copy.dir);
+  // Two videos must not play at once, and the page's own player is about to
+  // be hidden behind the backdrop anyway.
+  const pageFrame = document.querySelector("#persistent-player iframe") as HTMLIFrameElement | null;
+  command(pageFrame?.contentWindow, "pauseVideo");
 
-  let latest: PlayerInfo = {};
-  const stopWatching = watchPlayerInfo((info) => {
-    latest = { ...latest, ...info };
-  });
+  document.documentElement.setAttribute(ATTR, "");
+  mountChrome(copy.preparing, copy.dir);
+  const frame = mountStage(videoId, at);
+
+  // Fullscreen takes the address bar out of the shot and, on Android, is what
+  // makes the orientation lock legal. iOS refuses both for a non-video
+  // element, so neither is load-bearing.
+  try {
+    await document.getElementById(STAGE_ID)?.requestFullscreen?.({ navigationUI: "hide" });
+  } catch {
+    /* the CSS layout stands on its own */
+  }
+  const turned = await faceLandscape();
+
+  /*
+    Take the best quality ever reported rather than the latest: the number
+    dips while any new segment is being fetched, and sizing the stage from a
+    dip would shrink the frame for no reason.
+  */
+  let bestLines = 0;
+  let currentTime = -1;
+  const onMessage = (e: MessageEvent) => {
+    if (e.source !== frame.contentWindow) return;
+    try {
+      const data = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
+      const info = data?.info;
+      if (!info) return;
+      if (typeof info.currentTime === "number") currentTime = info.currentTime;
+      bestLines = Math.max(bestLines, QUALITY_LINES[info.playbackQuality ?? ""] ?? 0);
+    } catch {
+      /* not a player message */
+    }
+  };
+  window.addEventListener("message", onMessage);
 
   try {
-    // Fullscreen takes the address bar out of the shot and, on Android, is
-    // what makes the orientation lock below legal. iOS refuses both for a
-    // non-video element, so neither is allowed to be load-bearing.
-    try {
-      await document.getElementById("persistent-player")?.requestFullscreen?.({
-        navigationUI: "hide",
-      });
-    } catch {
-      /* the CSS layout stands on its own */
-    }
-    const turned = await faceLandscape();
-
-    /*
-      Seeking is what made the first attempt blurry in a second way: YouTube
-      refills its buffer with a low-quality segment after every seek, so
-      pausing straight afterwards freezes exactly that. Playing *through* the
-      moment instead leaves it buffered at full quality, and the seek back
-      then lands on data already downloaded.
-    */
-    commandPlayer("setPlaybackQuality", ["highres"]);
-    commandPlayer("seekTo", [Math.max(0, at - 3), true]);
-    commandPlayer("playVideo");
-
+    // Let it play into the moment so that stretch is buffered at full quality.
     const deadline = Date.now() + 9000;
-    while (Date.now() < deadline) {
+    while (Date.now() < deadline && currentTime < at) {
       await wait(200);
-      if ((latest.currentTime ?? -1) > at + 0.4) break;
     }
+    command(frame.contentWindow, "pauseVideo");
+    await wait(250);
 
-    commandPlayer("seekTo", [at, true]);
-    await wait(500);
-    commandPlayer("pauseVideo");
-
-    // Only now is the real ceiling known, so only now can the frame be sized
-    // honestly — and the user told what they are actually getting.
-    const lines = QUALITY_LINES[latest.playbackQuality ?? ""] ?? 0;
-    const size = lines ? sizeToNative(lines) : null;
-    const label = size ? `${size.width}×${size.height}` : "";
-
+    const size = sizeToNative(bestLines || ASSUMED_LINES);
     const needsTurn = !turned && isPortrait();
-    setLayerMessage(needsTurn ? `${copy.ready(label)} ${copy.rotate}` : copy.ready(label));
+    const text = copy.ready(`${size.width}×${size.height}`);
+    setLayerMessage(needsTurn ? `${text} ${copy.rotate}` : text);
   } finally {
-    stopWatching();
+    window.removeEventListener("message", onMessage);
   }
 }

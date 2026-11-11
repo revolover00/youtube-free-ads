@@ -546,15 +546,14 @@ try {
     while (Date.now() < deadline && !/screenshot|لقطة شاشة/i.test(card())) {
       await new Promise((r) => setTimeout(r, 150));
     }
-    const host = document.getElementById("persistent-player");
-    const cs = host ? getComputedStyle(host) : null;
+    const stage = document.getElementById("yt-shot-stage");
+    const cs = stage ? getComputedStyle(stage) : null;
     const layer = document.getElementById("yt-shot-layer");
+    const src = stage?.querySelector("iframe")?.getAttribute("src") ?? "";
     return {
       ok: true,
       armed: document.documentElement.hasAttribute("data-shot-mode"),
       fixed: cs?.position === "fixed",
-      fillsWidth: !!host && Math.abs(host.getBoundingClientRect().width - innerWidth) < 2,
-      fillsHeight: !!host && Math.abs(host.getBoundingClientRect().height - innerHeight) < 2,
       onTop: Number(cs?.zIndex ?? 0) > 1000000,
       dialogGone: !document.querySelector('[role="dialog"]'),
       tellsUser: /screenshot|لقطة شاشة/i.test(layer?.textContent ?? ""),
@@ -562,11 +561,24 @@ try {
       layerInvisible: layer
         ? getComputedStyle(layer).backgroundColor === "rgba(0, 0, 0, 0)"
         : false,
+      // The page's own embed runs with controls=1, so a paused frame is
+      // covered by YouTube's control bar and play button. The shot player
+      // must never carry them.
+      cleanPlayer: /[?&]controls=0(&|$)/.test(src),
+      noExtraChrome: /[?&]fs=0(&|$)/.test(src) && /[?&]iv_load_policy=3(&|$)/.test(src),
+      // Starts before the moment and plays into it: seeking onto it instead
+      // freezes the low-quality segment YouTube refills with.
+      startsBefore: /[?&]start=\d+/.test(src),
+      pageEmbedUntouched:
+        document.querySelector("#persistent-player iframe")?.getAttribute("src") !== src,
     };
   });
   check("shot mode arms", shot.ok && shot.armed, true);
-  check("the player is pinned over everything else", shot.fixed && shot.onTop, true);
-  check("it fills the screen the phone will photograph", shot.fillsWidth && shot.fillsHeight, true);
+  check("the shot player is pinned over everything else", shot.fixed && shot.onTop, true);
+  check("no YouTube control bar or play button over the frame", shot.cleanPlayer, true);
+  check("no fullscreen or annotation chrome either", shot.noExtraChrome, true);
+  check("it plays into the moment rather than seeking onto it", shot.startsBefore, true);
+  check("the page's own player is left alone", shot.pageEmbedUntouched, true);
   check("our own dialog is out of the picture", shot.dialogGone, true);
   check("the user is told to press their phone's buttons", shot.tellsUser, true);
   check("quality is raised before the frame is frozen, not after", shot.preparedFirst, true);

@@ -477,9 +477,13 @@ body {
 /*
   Shot mode — the phone's own screenshot is the only way to get the exact
   frame on mobile (see src/lib/shotMode.ts for the measurements behind that),
-  so the whole interface gets out of the picture and leaves the player alone
-  on a black screen. The player carries inline styles from App.tsx, hence the
-  !important; it is never reparented, which would reload the embed.
+  so the whole interface gets out of the picture and a bare, chrome-free
+  player is left alone on a black screen.
+
+  It is centred at the video's own resolution rather than stretched edge to
+  edge: upscaling a 720p source across a 2400px screen adds no detail, it
+  only interpolates. sizeToNative() sets the two variables; until the real
+  quality is known the fallback fills the screen.
 */
 html[data-shot-mode],
 html[data-shot-mode] body {
@@ -487,30 +491,16 @@ html[data-shot-mode] body {
   background: #000 !important;
 }
 
-html[data-shot-mode] #persistent-player {
-  /*
-    Centred at the video's own resolution rather than stretched edge to edge:
-    upscaling a 720p source across a 2400px screen adds no detail, it only
-    interpolates. sizeToNative() sets the two variables; before it knows the
-    real quality the fallback fills the screen.
-  */
-  position: fixed !important;
-  top: 50% !important;
-  left: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  width: var(--yt-shot-w, 100vw) !important;
-  height: var(--yt-shot-h, 100dvh) !important;
-  max-width: none !important;
-  max-height: none !important;
-  z-index: 2147483000 !important;
-  opacity: 1 !important;
-  border-radius: 0 !important;
-  background: #000 !important;
-  pointer-events: none !important;
-}
-
-html[data-shot-mode] #persistent-player iframe {
-  width: 100% !important;
-  height: 100% !important;
-  border-radius: 0 !important;
+#yt-shot-stage {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: var(--yt-shot-w, 100vw);
+  height: var(--yt-shot-h, 100dvh);
+  z-index: 2147483000;
+  background: #000;
+  overflow: hidden;
+  /* Taps belong to the exit catcher above, never to the player. */
+  pointer-events: none;
 }

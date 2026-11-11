@@ -267,9 +267,11 @@ export default function ScreenshotDialog({
   const prepareForPhoneShot = () => {
     const at = getTimeRef.current?.() ?? time;
     onClose();
-    void enterShotMode(at, {
+    void enterShotMode(videoId, at, {
       dir: isAr ? "rtl" : "ltr",
-      preparing: isAr ? "بظبّط أعلى جودة ممكنة…" : "Pushing the player up to its best quality…",
+      preparing: isAr
+        ? "بحضّر نسخة نضيفة من غير أزرار يوتيوب، وبأعلى جودة…"
+        : "Loading a clean copy with no YouTube controls, at the best quality…",
       ready: (size: string) =>
         isAr
           ? `جاهز على اللحظة دي${size ? ` — الإطار ${size}، وديه أعلى جودة في الفيديو نفسه` : ""}. خد لقطة شاشة دلوقتي، وبعدين دوس في أي حتة ترجع.`
@@ -437,8 +439,8 @@ export default function ScreenshotDialog({
               </p>
               <p className="mt-1 text-[12px] leading-[17px] text-yt-sub">
                 {isAr
-                  ? "هرفع الجودة لأقصى حاجة في الفيديو، وأعدّي على اللحظة دي وهي محمّلة بالجودة دي، وبعدين أرجعلها وأوقّف — وأعرضها بمقاسها الأصلي من غير تكبير يبوّظها. ساعتها خد لقطة شاشة عادي."
-                  : "The quality is pushed to whatever the video actually carries, the moment is played through so it is buffered at that quality, and then it is frozen and shown at its true size — no upscaling to soften it. Then take a screenshot as usual."}
+                  ? "هفتح نسخة من الفيديو من غير شريط تحكم ولا زرار تشغيل فوق الصورة، بأعلى جودة، وأوقّفها على اللحظة دي وأعرضها بمقاسها الأصلي من غير تكبير يبوّظها. ساعتها خد لقطة شاشة عادي."
+                  : "A copy of the video opens with no control bar and no play button over the frame, at the best quality, paused on this moment and shown at its true size — no upscaling to soften it. Then take a screenshot as usual."}
               </p>
               <button
                 type="button"
