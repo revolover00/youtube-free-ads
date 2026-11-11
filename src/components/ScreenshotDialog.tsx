@@ -24,6 +24,7 @@ import {
   type CaptureTier,
 } from "../lib/frame";
 import { fmtDuration } from "../lib/format";
+import { enterShotMode } from "../lib/shotMode";
 import { useLanguage } from "../lib/i18n";
 
 interface Props {
@@ -257,6 +258,22 @@ export default function ScreenshotDialog({
     void run("hd", captionCard);
   };
 
+  /*
+    On a phone this is the only path that ends in the real frame: no mobile
+    browser has screen capture, YouTube refuses the server every frame source,
+    and the embed's pixels are cross-origin. The phone's own screenshot button
+    still works perfectly -- it just needs our interface out of the picture.
+  */
+  const prepareForPhoneShot = () => {
+    onClose();
+    void enterShotMode(
+      isAr
+        ? "الفيديو واقف على اللحظة دي. خد لقطة شاشة بزراير تليفونك دلوقتي — وبعدين دوس في أي حتة ترجع."
+        : "Paused on your moment. Take a screenshot with your phone's buttons now — then tap anywhere to go back.",
+      isAr ? "rtl" : "ltr",
+    );
+  };
+
   /** The rough-but-instant preview, now that it is never forced on anyone. */
   const runQuick = () => {
     if (busy) return;
@@ -325,8 +342,8 @@ export default function ScreenshotDialog({
                           ? "يوتيوب مش بيدّي السيرفر اللحظة دي، واللي عنده صورة الغلاف بس — ودي مش اللقطة اللي إنت عايزها. التقطها من شاشتك بالزر اللي تحت."
                           : "YouTube will not give the server this moment — only the cover image, which is not the frame you want. Grab it from your own screen with the button below."
                         : isAr
-                          ? "يوتيوب مش بيدّي السيرفر اللحظة دي، ومتصفحات الموبايل مفيهاش مشاركة شاشة — فمفيش طريقة نجيب لك الإطار ده هنا. افتح الصفحة من كمبيوتر علشان تلتقطه بالظبط."
-                          : "YouTube will not give the server this moment, and mobile browsers have no screen capture — so there is no way to get you this frame here. Open the page on a computer to capture it exactly."
+                          ? "يوتيوب رفض يدّي السيرفر اللحظة دي. على التليفون لسه فيه طريقة تجيبها بدقة كاملة — تحت."
+                          : "YouTube refused the server this moment. On a phone there is still a way to get it at full resolution — below."
                       : failed
                         ? t("screenshotFailed")
                         : t("screenshotHint")}
@@ -398,37 +415,61 @@ export default function ScreenshotDialog({
             never as the moment — so the dialog ends in a choice rather than a
             dead end.
           */}
+          {/*
+            A phone cannot be given the frame by this app -- measured, not
+            assumed; the reasoning is in src/lib/shotMode.ts. It can still get
+            the frame, at full screen resolution, from the screenshot button
+            it already has. So that is what this leads with, instead of an
+            apology with nothing behind it.
+          */}
           {posterIsUseless && !hdAvailable && (
             <div className="mt-2.5 rounded-lg bg-yt-surface px-3 py-2.5">
-              <p className="text-[13px] leading-[18px] text-yt-sub">
+              <p className="text-[13px] font-medium leading-[18px] text-yt-text">
                 {isAr
-                  ? "لو صورة غلاف الفيديو تنفعك، تقدر تعرضها — بس خلي بالك إنها مش اللحظة اللي إنت واقف عندها."
-                  : "If the video's cover image is useful to you, you can show it — but it is not the moment you are paused on."}
+                  ? "على التليفون، اللقطة بتتاخد من زراير التليفون نفسه"
+                  : "On a phone, the shot comes from the phone's own buttons"}
               </p>
-              {/*
-                Each attempt opens a brand-new YouTube session, so a second
-                press is a genuinely new roll rather than a repeat of the same
-                failed request. Without this a phone had no way to retry at
-                all -- the only retry lived inside the screen-capture card,
-                which a phone never sees.
-              */}
+              <p className="mt-1 text-[12px] leading-[17px] text-yt-sub">
+                {isAr
+                  ? "هوقّف الفيديو على اللحظة دي بالظبط وأفرد الصورة على الشاشة كلها وأشيل كل حاجة من قدامك. بعدها خد لقطة شاشة عادي — هتطلع بدقة شاشتك الكاملة."
+                  : "The video pauses on this exact moment, fills the whole screen, and everything else gets out of the way. Then take a screenshot as usual — at your screen's full resolution."}
+              </p>
               <button
                 type="button"
-                onClick={runQuick}
-                disabled={busy}
-                className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-full bg-yt-text px-4 text-[13px] font-medium text-yt-bg hover:bg-white disabled:opacity-50"
+                onClick={prepareForPhoneShot}
+                className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-full bg-yt-text px-4 text-[13px] font-medium text-yt-bg hover:bg-white"
               >
-                <RotateCw className="h-4 w-4" />
-                {isAr ? "حاول تاني" : "Try again"}
+                <Camera className="h-4 w-4" />
+                {isAr ? "جهّز الشاشة للقطة" : "Set up the shot"}
               </button>
-              <button
-                type="button"
-                onClick={() => setPosterAccepted(true)}
-                disabled={busy}
-                className="mt-2 ms-2 inline-flex h-9 items-center rounded-full px-3 text-[13px] text-yt-sub hover:bg-yt-hover hover:text-yt-text disabled:opacity-50"
-              >
-                {isAr ? "اعرض صورة الغلاف بدل كده" : "Show the cover image instead"}
-              </button>
+              <div className="mt-2.5 border-t border-yt-border pt-2.5">
+                <p className="text-[12px] leading-[17px] text-yt-sub">
+                  {isAr
+                    ? "أو جرّب السيرفر تاني — كل محاولة بتفتح جلسة يوتيوب جديدة، فساعات بتعدّي."
+                    : "Or try the server again — each attempt opens a fresh YouTube session, so it sometimes gets through."}
+                </p>
+                {/*
+                  Without this a phone had no retry at all: the only one lived
+                  inside the screen-capture card, which a phone never renders.
+                */}
+                <button
+                  type="button"
+                  onClick={runQuick}
+                  disabled={busy}
+                  className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] text-yt-sub hover:bg-yt-hover hover:text-yt-text disabled:opacity-50"
+                >
+                  <RotateCw className="h-4 w-4" />
+                  {isAr ? "حاول تاني" : "Try again"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPosterAccepted(true)}
+                  disabled={busy}
+                  className="mt-2 ms-1 inline-flex h-9 items-center rounded-full px-3 text-[13px] text-yt-sub hover:bg-yt-hover hover:text-yt-text disabled:opacity-50"
+                >
+                  {isAr ? "اعرض صورة الغلاف بدل كده" : "Show the cover image instead"}
+                </button>
+              </div>
             </div>
           )}
 

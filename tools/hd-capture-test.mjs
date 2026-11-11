@@ -497,8 +497,8 @@ try {
     true,
   );
   check(
-    "the phone is told why, and where it can be done",
-    /computer|كمبيوتر/i.test(await phoneText()),
+    "the phone is offered the one route that does end in the real frame",
+    /set up the shot|جهّز الشاشة للقطة/i.test(await phoneText()),
     true,
   );
   check(
@@ -526,6 +526,53 @@ try {
     ),
     true,
   );
+
+  // Shot mode is the whole mobile answer, so it has to actually clear the
+  // screen: a paused player filling the viewport above everything else, with
+  // the instruction gone before the user presses the phone's buttons.
+  const shot = await page.evaluate(async () => {
+    const btn = [...document.querySelectorAll('[role="dialog"] button')].find((b) =>
+      /set up the shot|جهّز الشاشة للقطة/i.test(b.textContent ?? ""),
+    );
+    if (!btn) return { ok: false };
+    btn.click();
+    await new Promise((r) => setTimeout(r, 400));
+    const host = document.getElementById("persistent-player");
+    const cs = host ? getComputedStyle(host) : null;
+    const layer = document.getElementById("yt-shot-layer");
+    return {
+      ok: true,
+      armed: document.documentElement.hasAttribute("data-shot-mode"),
+      fixed: cs?.position === "fixed",
+      fillsWidth: !!host && Math.abs(host.getBoundingClientRect().width - innerWidth) < 2,
+      fillsHeight: !!host && Math.abs(host.getBoundingClientRect().height - innerHeight) < 2,
+      onTop: Number(cs?.zIndex ?? 0) > 1000000,
+      dialogGone: !document.querySelector('[role="dialog"]'),
+      tellsUser: /screenshot|لقطة شاشة/i.test(layer?.textContent ?? ""),
+      layerInvisible: layer
+        ? getComputedStyle(layer).backgroundColor === "rgba(0, 0, 0, 0)"
+        : false,
+    };
+  });
+  check("shot mode arms", shot.ok && shot.armed, true);
+  check("the player is pinned over everything else", shot.fixed && shot.onTop, true);
+  check("it fills the screen the phone will photograph", shot.fillsWidth && shot.fillsHeight, true);
+  check("our own dialog is out of the picture", shot.dialogGone, true);
+  check("the user is told to press their phone's buttons", shot.tellsUser, true);
+  check("the instruction layer tints nothing", shot.layerInvisible, true);
+
+  const exited = await page.evaluate(async () => {
+    document.getElementById("yt-shot-layer")?.click();
+    await new Promise((r) => setTimeout(r, 200));
+    return {
+      disarmed: !document.documentElement.hasAttribute("data-shot-mode"),
+      layerGone: !document.getElementById("yt-shot-layer"),
+    };
+  });
+  check("a tap anywhere gives the app back", exited.disarmed && exited.layerGone, true);
+
+  await openDialog(page, { proven: true });
+  await settle(page);
 
   const revealed = await page.evaluate(() => {
     const btn = [...document.querySelectorAll('[role="dialog"] button')].find((b) =>

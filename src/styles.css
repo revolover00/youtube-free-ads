@@ -473,3 +473,39 @@ body {
 .dropdown-in {
   animation: fadein 0.18s ease-out;
 }
+
+/*
+  Shot mode — the phone's own screenshot is the only way to get the exact
+  frame on mobile (see src/lib/shotMode.ts for the measurements behind that),
+  so the whole interface gets out of the picture and leaves the player alone
+  on a black screen. The player carries inline styles from App.tsx, hence the
+  !important; it is never reparented, which would reload the embed.
+*/
+html[data-shot-mode],
+html[data-shot-mode] body {
+  overflow: hidden !important;
+  background: #000 !important;
+}
+
+html[data-shot-mode] #persistent-player {
+  position: fixed !important;
+  inset: 0 !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  max-width: none !important;
+  max-height: none !important;
+  z-index: 2147483000 !important;
+  opacity: 1 !important;
+  transform: none !important;
+  border-radius: 0 !important;
+  background: #000 !important;
+  pointer-events: none !important;
+}
+
+html[data-shot-mode] #persistent-player iframe {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 0 !important;
+}
