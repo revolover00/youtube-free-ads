@@ -222,6 +222,20 @@ async function openDialog(page, { proven }) {
   await settle(page);
 }
 
+/** The opt-in rough preview, used by scenarios that need the server path. */
+async function clickQuickPreview(page) {
+  const clicked = await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('[role="dialog"] button')].find((b) =>
+      /rough preview instead|معاينة تقريبية بدل كده/i.test(b.textContent ?? ""),
+    );
+    if (!btn) return false;
+    btn.click();
+    return true;
+  });
+  if (!clicked) throw new Error("rough preview button not found");
+  await settle(page);
+}
+
 /** The explained one-click path shown whenever the image is not a real grab. */
 async function clickCaptureCta(page) {
   const clicked = await page.evaluate(() => {
@@ -243,7 +257,7 @@ const ctaPresent = (page) =>
     ),
   );
 
-async function newWatchPage() {
+async function newWatchPage(videoId = VIDEO) {
   const page = await browser.newPage();
   page.on("pageerror", (e) => console.error(`  [page error] ${e.message}`));
   page.on("console", (m) => {
@@ -255,7 +269,7 @@ async function newWatchPage() {
     }
   });
   await page.setViewport(VIEWPORT);
-  await page.goto(`${BASE}/watch?v=${VIDEO}`, { waitUntil: "networkidle2", timeout: 60000 });
+  await page.goto(`${BASE}/watch?v=${videoId}`, { waitUntil: "networkidle2", timeout: 60000 });
   await page.waitForSelector("#persistent-player", { timeout: 20000 });
   return page;
 }
@@ -399,6 +413,42 @@ try {
     "1",
   );
   check("the prompt offer disappears once the image is a real grab", await ctaPresent(page), false);
+  await page.close();
+
+  // ---- 4. A cover image is never passed off as the captured frame --------
+  // YouTube closed the session loophole that briefly made server-side
+  // storyboards work, so "no storyboard available" is now the normal answer.
+  // What must never happen again is the poster being handed over as if it
+  // were the moment the user is paused on.
+  console.log("\nan unavailable moment is admitted, not papered over with the poster");
+  page = await newWatchPage("poster-fixture");
+  await markPlayer(page);
+  await installPageSurface(page);
+  await openDialog(page, { proven: false });
+  await clickQuickPreview(page);
+
+  check(
+    "the cover image is not displayed as the capture",
+    await page.evaluate(() => !document.querySelector('[role="dialog"] img')),
+    true,
+  );
+  check(
+    "the reason is stated in the user's own language",
+    await page.evaluate(() =>
+      /cover image|صورة الغلاف/i.test(document.querySelector('[role="dialog"]')?.innerText ?? ""),
+    ),
+    true,
+  );
+  check(
+    "nothing copyable or savable is offered for an image that is not there",
+    await page.evaluate(() =>
+      [...document.querySelectorAll('[role="dialog"] button')]
+        .filter((b) => /copy|save|download|نسخ|حفظ|تنزيل/i.test(b.textContent ?? ""))
+        .every((b) => b.disabled),
+    ),
+    true,
+  );
+  check("the real capture is still offered as the way out", await ctaPresent(page), true);
   await page.close();
 } finally {
   await browser.close();

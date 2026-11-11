@@ -133,7 +133,25 @@ export const FIXTURE_STORYBOARD = {
 };
 
 /** Mirrors videoFrame()'s geometry maths against the synthetic sheet. */
-export function fixtureVideoFrame(time: number) {
+/** Video id that makes the fixture server report a storyboard it cannot reach. */
+export const FIXTURE_POSTER_ID = "poster-fixture";
+
+export function fixtureVideoFrame(time: number, videoId = "") {
+  // Lets the harness exercise the "the server cannot see this moment" path,
+  // which is now the common real-world outcome and the one that used to hand
+  // the user a cover image pretending to be their frame.
+  if (videoId === FIXTURE_POSTER_ID) {
+    return {
+      sheet: FIXTURE_STORYBOARD.sheet,
+      x: 0,
+      y: 0,
+      width: 1280,
+      height: 720,
+      at: Math.max(0, Number.isFinite(time) ? time : 0),
+      source: "poster" as const,
+      note: "no storyboard available",
+    };
+  }
   const b = FIXTURE_STORYBOARD;
   const at = Math.max(0, Number.isFinite(time) ? time : 0);
   const frameIndex = Math.min(

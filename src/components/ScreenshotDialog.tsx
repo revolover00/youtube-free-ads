@@ -224,6 +224,15 @@ export default function ScreenshotDialog({
   const fileName = frameFileName(title, result?.at ?? time);
   const hdAvailable = isHdCaptureSupported();
 
+  /*
+    The poster is the video's cover image, so at any timestamp past the opening
+    seconds it is simply the wrong picture. Showing it as the capture is how
+    this feature keeps looking broken. Where the real frame is one click away,
+    withhold it and say so; on a browser with no screen capture at all it stays
+    the only thing on offer, clearly labelled.
+  */
+  const posterIsUseless = result?.source === "poster" && hdAvailable;
+
   const onPickTier = (next: CaptureTier) => {
     if (next === tier || busy) return;
     setTier(next);
@@ -284,7 +293,7 @@ export default function ScreenshotDialog({
 
         <div className="px-5 pb-1">
           <div className="relative grid min-h-[200px] place-items-center overflow-hidden rounded-xl bg-black">
-            {result ? (
+            {result && !posterIsUseless ? (
               <img
                 src={result.dataUrl}
                 alt={t("screenshotTitle")}
@@ -299,7 +308,13 @@ export default function ScreenshotDialog({
                   </>
                 ) : (
                   <span className="px-6 text-center text-sm">
-                    {failed ? t("screenshotFailed") : t("screenshotHint")}
+                    {posterIsUseless
+                      ? isAr
+                        ? "يوتيوب مش بيدّي السيرفر اللحظة دي، واللي عنده صورة الغلاف بس — ودي مش اللقطة اللي إنت عايزها. التقطها من شاشتك بالزر اللي تحت."
+                        : "YouTube will not give the server this moment — only the cover image, which is not the frame you want. Grab it from your own screen with the button below."
+                      : failed
+                        ? t("screenshotFailed")
+                        : t("screenshotHint")}
                   </span>
                 )}
               </div>
@@ -317,7 +332,7 @@ export default function ScreenshotDialog({
             That still produces an image, so without a clear notice it looks
             like a successful capture of the wrong moment — worse than an error.
           */}
-          {result?.source === "poster" && (
+          {result?.source === "poster" && !posterIsUseless && (
             <div className="mt-2.5 flex items-start gap-2 rounded-lg bg-[#3a2e00] px-3 py-2 text-[13px] leading-[18px] text-[#ffd95c]">
               <AlertTriangle className="mt-px h-4 w-4 shrink-0" />
               <span className="min-w-0">
@@ -410,7 +425,7 @@ export default function ScreenshotDialog({
           )}
 
           <p className="mt-2.5 text-[13px] text-yt-sub">
-            {result ? (
+            {result && !posterIsUseless ? (
               <>
                 {fmtDuration(Math.round(result.at)) || "0:00"}
                 {" · "}
@@ -453,7 +468,7 @@ export default function ScreenshotDialog({
 
           {canShareCapture() && (
             <button
-              disabled={!result || busy}
+              disabled={!result || posterIsUseless || busy}
               onClick={() => {
                 if (!result) return;
                 shareCapture(result, fileName, title).catch(() => {});
@@ -466,7 +481,7 @@ export default function ScreenshotDialog({
           )}
 
           <button
-            disabled={!result || busy}
+            disabled={!result || posterIsUseless || busy}
             onClick={() => {
               if (!result) return;
               copyCapture(result)
@@ -484,7 +499,7 @@ export default function ScreenshotDialog({
           </button>
 
           <button
-            disabled={!result || busy}
+            disabled={!result || posterIsUseless || busy}
             onClick={() => {
               if (!result) return;
               void downloadCapture(result, fileName);

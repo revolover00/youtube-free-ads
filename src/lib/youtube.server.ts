@@ -1630,14 +1630,14 @@ export interface FrameResult {
  * clips, some live streams); callers must surface which one they got.
  */
 export async function videoFrame(videoId: string, time: number): Promise<FrameResult> {
-  if (USE_FIXTURE) return fixtureVideoFrame(time);
+  if (USE_FIXTURE) return fixtureVideoFrame(time, videoId);
   const at = Math.max(0, Number.isFinite(time) ? time : 0);
   const problems: string[] = [];
 
   try {
     // Worth several swings: this is an explicit "give me this exact frame"
     // request, and the alternative is handing back the cover image.
-    const { duration, storyboardSpec } = await playerMeta(videoId, 9);
+    const { duration, storyboardSpec } = await playerMeta(videoId, 3);
     const levels = parseStoryboardSpec(storyboardSpec);
 
     if (!levels.length) {
