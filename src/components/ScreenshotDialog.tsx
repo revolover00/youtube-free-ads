@@ -104,6 +104,11 @@ export default function ScreenshotDialog({
   /** Why the screen grab did not happen, shown verbatim so it is diagnosable. */
   const [hdNotice, setHdNotice] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  /*
+    The cover image is only ever shown because the user asked for it by name,
+    never as the answer to "capture this moment".
+  */
+  const [posterAccepted, setPosterAccepted] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -118,6 +123,7 @@ export default function ScreenshotDialog({
     async (nextTier: CaptureTier, nextCard: boolean) => {
       setBusy(true);
       setFailed(null);
+      setPosterAccepted(false);
       const opts = {
         videoId,
         time,
@@ -190,6 +196,7 @@ export default function ScreenshotDialog({
     if (!open) return;
     setResult(null);
     setCopied(false);
+    setPosterAccepted(false);
     setCaptionCard(false);
     setHdNotice(null);
     const canHd = isHdCaptureSupported();
@@ -226,12 +233,15 @@ export default function ScreenshotDialog({
 
   /*
     The poster is the video's cover image, so at any timestamp past the opening
-    seconds it is simply the wrong picture. Showing it as the capture is how
-    this feature keeps looking broken. Where the real frame is one click away,
-    withhold it and say so; on a browser with no screen capture at all it stays
-    the only thing on offer, clearly labelled.
+    seconds it is simply the wrong picture.
+
+    This used to be withheld only where screen capture could replace it, which
+    left every phone — no getDisplayMedia anywhere on mobile — still being
+    handed a cover image as "your frame" at 56 minutes in. A wrong picture is
+    not a better answer than no picture on any device, so now it is withheld
+    everywhere and only ever appears if the user asks for it by name.
   */
-  const posterIsUseless = result?.source === "poster" && hdAvailable;
+  const posterIsUseless = result?.source === "poster" && !posterAccepted;
 
   const onPickTier = (next: CaptureTier) => {
     if (next === tier || busy) return;
@@ -309,9 +319,13 @@ export default function ScreenshotDialog({
                 ) : (
                   <span className="px-6 text-center text-sm">
                     {posterIsUseless
-                      ? isAr
-                        ? "يوتيوب مش بيدّي السيرفر اللحظة دي، واللي عنده صورة الغلاف بس — ودي مش اللقطة اللي إنت عايزها. التقطها من شاشتك بالزر اللي تحت."
-                        : "YouTube will not give the server this moment — only the cover image, which is not the frame you want. Grab it from your own screen with the button below."
+                      ? hdAvailable
+                        ? isAr
+                          ? "يوتيوب مش بيدّي السيرفر اللحظة دي، واللي عنده صورة الغلاف بس — ودي مش اللقطة اللي إنت عايزها. التقطها من شاشتك بالزر اللي تحت."
+                          : "YouTube will not give the server this moment — only the cover image, which is not the frame you want. Grab it from your own screen with the button below."
+                        : isAr
+                          ? "يوتيوب مش بيدّي السيرفر اللحظة دي، ومتصفحات الموبايل مفيهاش مشاركة شاشة — فمفيش طريقة نجيب لك الإطار ده هنا. افتح الصفحة من كمبيوتر علشان تلتقطه بالظبط."
+                          : "YouTube will not give the server this moment, and mobile browsers have no screen capture — so there is no way to get you this frame here. Open the page on a computer to capture it exactly."
                       : failed
                         ? t("screenshotFailed")
                         : t("screenshotHint")}
@@ -373,6 +387,30 @@ export default function ScreenshotDialog({
                   ? "شاركت شاشة أو نافذة كاملة، فاللقطة هي كل ما شاركته. اختر «علامة التبويب هذه» للحصول على الفيديو وحده."
                   : "You shared a whole screen or window, so this is all of it. Choose “This tab” to get just the video."}
               </span>
+            </div>
+          )}
+
+          {/*
+            With no screen capture on the device there is nothing true left to
+            offer, so the only honest move is to stop and say so. The cover
+            image is still one deliberate tap away — named as the cover image,
+            never as the moment — so the dialog ends in a choice rather than a
+            dead end.
+          */}
+          {posterIsUseless && !hdAvailable && (
+            <div className="mt-2.5 rounded-lg bg-yt-surface px-3 py-2.5">
+              <p className="text-[13px] leading-[18px] text-yt-sub">
+                {isAr
+                  ? "لو صورة غلاف الفيديو تنفعك، تقدر تعرضها — بس خلي بالك إنها مش اللحظة اللي إنت واقف عندها."
+                  : "If the video's cover image is useful to you, you can show it — but it is not the moment you are paused on."}
+              </p>
+              <button
+                type="button"
+                onClick={() => setPosterAccepted(true)}
+                className="mt-2 inline-flex h-9 items-center rounded-full px-3 text-[13px] text-yt-sub hover:bg-yt-hover hover:text-yt-text"
+              >
+                {isAr ? "اعرض صورة الغلاف بدل كده" : "Show the cover image instead"}
+              </button>
             </div>
           )}
 

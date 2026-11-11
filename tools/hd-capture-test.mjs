@@ -179,11 +179,23 @@ async function settle(page, { timeout = 30000 } = {}) {
         offering: [...(dialog?.querySelectorAll("button") ?? [])].some((b) =>
           /capture the real frame|التقط الإطار الحقيقي/i.test(b.textContent ?? ""),
         ),
+        // A device with no screen capture can reach neither of those: it rests
+        // on an explanation plus the opt-in to view the cover image.
+        explaining: [...(dialog?.querySelectorAll("button") ?? [])].some((b) =>
+          /show the cover image instead|اعرض صورة الغلاف بدل كده/i.test(b.textContent ?? ""),
+        ),
       };
     });
-    // Two legitimate resting states: an image is ready, or -- on a first visit
-    // -- the dialog is deliberately holding nothing but the offer to capture.
-    if (state.visible && !state.spinning && (state.hasImage || state.offering)) return;
+    // Three legitimate resting states: an image is ready; the dialog is
+    // holding nothing but the offer to capture; or capture is impossible here
+    // and it is saying so.
+    if (
+      state.visible &&
+      !state.spinning &&
+      (state.hasImage || state.offering || state.explaining)
+    ) {
+      return;
+    }
     if (Date.now() > deadline) throw new Error(`capture never settled: ${JSON.stringify(state)}`);
     await new Promise((r) => setTimeout(r, 250));
   }
@@ -214,7 +226,9 @@ async function openDialog(page, { proven }) {
       if (!dlg) return false;
       if (dlg.querySelector("img")) return true;
       return [...dlg.querySelectorAll("button")].some((b) =>
-        /capture the real frame|التقط الإطار الحقيقي/i.test(b.textContent ?? ""),
+        /capture the real frame|التقط الإطار الحقيقي|show the cover image instead|اعرض صورة الغلاف بدل كده/i.test(
+          b.textContent ?? "",
+        ),
       );
     },
     { timeout: 20000 },
@@ -257,8 +271,20 @@ const ctaPresent = (page) =>
     ),
   );
 
-async function newWatchPage(videoId = VIDEO) {
+async function newWatchPage(videoId = VIDEO, { noScreenCapture = false } = {}) {
   const page = await browser.newPage();
+  if (noScreenCapture) {
+    // Every mobile browser is this: mediaDevices exists, getDisplayMedia does
+    // not. It has to be gone before the app's first render reads it.
+    await page.evaluateOnNewDocument(() => {
+      // getDisplayMedia lives on MediaDevices.prototype, so deleting it off
+      // the instance is a no-op; shadow it with an own undefined instead.
+      const md = navigator.mediaDevices;
+      if (md) {
+        Object.defineProperty(md, "getDisplayMedia", { value: undefined, configurable: true });
+      }
+    });
+  }
   page.on("pageerror", (e) => console.error(`  [page error] ${e.message}`));
   page.on("console", (m) => {
     // Offline fixtures cannot load thumbnails or the YouTube embed; that noise
@@ -449,6 +475,57 @@ try {
     true,
   );
   check("the real capture is still offered as the way out", await ctaPresent(page), true);
+  await page.close();
+
+  // ---- 5. A phone, where screen capture does not exist at all -----------
+  // The previous round withheld the poster only where screen capture could
+  // replace it, so phones kept being handed a cover image as "your frame".
+  // Nothing true is reachable here, and that has to be said rather than
+  // covered up with the wrong picture.
+  console.log("\na phone is told the truth instead of being handed the cover image");
+  page = await newWatchPage("poster-fixture", { noScreenCapture: true });
+  await markPlayer(page);
+  await openDialog(page, { proven: true });
+  await settle(page);
+
+  const phoneText = () =>
+    page.evaluate(() => document.querySelector('[role="dialog"]')?.innerText ?? "");
+
+  check(
+    "the cover image is not shown on a phone either",
+    await page.evaluate(() => !document.querySelector('[role="dialog"] img')),
+    true,
+  );
+  check(
+    "the phone is told why, and where it can be done",
+    /computer|كمبيوتر/i.test(await phoneText()),
+    true,
+  );
+  check(
+    "no screen-capture button is dangled at a device that cannot do it",
+    await ctaPresent(page),
+    false,
+  );
+
+  const revealed = await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('[role="dialog"] button')].find((b) =>
+      /show the cover image instead|اعرض صورة الغلاف بدل كده/i.test(b.textContent ?? ""),
+    );
+    if (!btn) return false;
+    btn.click();
+    return true;
+  });
+  check("the cover image is still reachable on purpose", revealed, true);
+  await settle(page);
+  check(
+    "once asked for, it appears and is labelled as the cover image",
+    await page.evaluate(
+      () =>
+        !!document.querySelector('[role="dialog"] img') &&
+        /غلاف|cover/i.test(document.querySelector('[role="dialog"]')?.innerText ?? ""),
+    ),
+    true,
+  );
   await page.close();
 } finally {
   await browser.close();

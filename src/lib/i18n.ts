@@ -247,7 +247,7 @@ export const TRANSLATIONS = {
     screenshotWorking: "Capturing frame…",
     screenshotHdHint: "Pick this tab in the prompt for a full-resolution grab",
     screenshotSourcePoster:
-      "Could not fetch the exact frame, so this is the video's poster image, not your timestamp.",
+      "Could not fetch the exact frame, so this is the video's cover image, not the moment you are paused on.",
   },
   ar: {
     // Brand
