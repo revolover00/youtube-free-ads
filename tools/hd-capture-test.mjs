@@ -536,7 +536,16 @@ try {
     );
     if (!btn) return { ok: false };
     btn.click();
-    await new Promise((r) => setTimeout(r, 400));
+    // The sequence deliberately takes a couple of seconds: enlarge, let the
+    // embed re-fetch at the new size, seek back, pause. Waiting for the text
+    // to change is what proves it ran in that order rather than freezing a
+    // low-resolution frame up front.
+    const card = () => document.getElementById("yt-shot-card")?.textContent ?? "";
+    const preparing = card();
+    const deadline = Date.now() + 15000;
+    while (Date.now() < deadline && !/screenshot|لقطة شاشة/i.test(card())) {
+      await new Promise((r) => setTimeout(r, 150));
+    }
     const host = document.getElementById("persistent-player");
     const cs = host ? getComputedStyle(host) : null;
     const layer = document.getElementById("yt-shot-layer");
@@ -549,6 +558,7 @@ try {
       onTop: Number(cs?.zIndex ?? 0) > 1000000,
       dialogGone: !document.querySelector('[role="dialog"]'),
       tellsUser: /screenshot|لقطة شاشة/i.test(layer?.textContent ?? ""),
+      preparedFirst: /quality|جودة/i.test(preparing),
       layerInvisible: layer
         ? getComputedStyle(layer).backgroundColor === "rgba(0, 0, 0, 0)"
         : false,
@@ -559,6 +569,7 @@ try {
   check("it fills the screen the phone will photograph", shot.fillsWidth && shot.fillsHeight, true);
   check("our own dialog is out of the picture", shot.dialogGone, true);
   check("the user is told to press their phone's buttons", shot.tellsUser, true);
+  check("quality is raised before the frame is frozen, not after", shot.preparedFirst, true);
   check("the instruction layer tints nothing", shot.layerInvisible, true);
 
   const exited = await page.evaluate(async () => {

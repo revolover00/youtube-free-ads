@@ -25,9 +25,34 @@ const ATTR = "data-shot-mode";
 const LAYER_ID = "yt-shot-layer";
 
 /** The YouTube embed takes commands over postMessage; this is how Watch.tsx drives it. */
-function commandPlayer(func: string): void {
+function commandPlayer(func: string, args: unknown[] = []): void {
   const iframe = document.querySelector("#persistent-player iframe") as HTMLIFrameElement | null;
-  iframe?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args: [] }), "*");
+  iframe?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), "*");
+}
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * A 16:9 video inside a portrait phone only gets about a quarter of the
+ * screen, so the screenshot is mostly black bars. Landscape hands the same
+ * video roughly three times the pixels, which is the difference between a
+ * usable frame and a thumbnail.
+ */
+async function faceLandscape(): Promise<boolean> {
+  try {
+    const orientation = screen.orientation as ScreenOrientation & {
+      lock?: (o: string) => Promise<void>;
+    };
+    await orientation.lock?.("landscape");
+    return true;
+  } catch {
+    // iOS has no orientation lock, and Android refuses it outside fullscreen.
+    return false;
+  }
+}
+
+function isPortrait(): boolean {
+  return window.innerHeight > window.innerWidth;
 }
 
 export function isShotModeActive(): boolean {
@@ -50,7 +75,23 @@ export function exitShotMode(): void {
  * screen lands in the user's photo. It fades itself out and leaves behind an
  * invisible catcher so a tap anywhere returns to the app.
  */
-function mountLayer(message: string, dir: "rtl" | "ltr"): void {
+const CARD_ID = "yt-shot-card";
+
+/**
+ * Swap the text without remounting, so the preparing notice can become the
+ * instruction in place, and only then start counting down to invisibility.
+ */
+function setLayerMessage(message: string): void {
+  const card = document.getElementById(CARD_ID);
+  if (!card) return;
+  card.textContent = message;
+  // Long enough to read, short enough that nobody is still waiting for it.
+  window.setTimeout(() => {
+    card.style.opacity = "0";
+  }, 2800);
+}
+
+function mountLayer(message: string, dir: "rtl" | "ltr", { fade } = { fade: true }): void {
   document.getElementById(LAYER_ID)?.remove();
 
   const layer = document.createElement("div");
@@ -69,6 +110,7 @@ function mountLayer(message: string, dir: "rtl" | "ltr"): void {
   } satisfies Partial<CSSStyleDeclaration>);
 
   const card = document.createElement("div");
+  card.id = CARD_ID;
   card.textContent = message;
   Object.assign(card.style, {
     maxWidth: "min(88vw, 420px)",
@@ -87,29 +129,67 @@ function mountLayer(message: string, dir: "rtl" | "ltr"): void {
   layer.addEventListener("click", exitShotMode, { once: true });
   document.body.appendChild(layer);
 
-  // Long enough to read, short enough that nobody is still waiting for it.
-  window.setTimeout(() => {
-    card.style.opacity = "0";
-  }, 2600);
+  if (fade) {
+    window.setTimeout(() => {
+      card.style.opacity = "0";
+    }, 2800);
+  }
 }
 
-export async function enterShotMode(message: string, dir: "rtl" | "ltr"): Promise<void> {
+export interface ShotCopy {
+  /** Shown while the player is being pushed up to a usable resolution. */
+  preparing: string;
+  /** Shown once the frame is ready to be photographed. */
+  ready: string;
+  /** Appended when the phone is still portrait and could not be turned for them. */
+  rotate: string;
+  dir: "rtl" | "ltr";
+}
+
+/**
+ * @param at seconds to land on — the moment the user actually asked for.
+ */
+export async function enterShotMode(at: number, copy: ShotCopy): Promise<void> {
   if (typeof document === "undefined") return;
 
-  // A moving frame cannot be photographed, and the paused frame is precisely
-  // the moment the user asked for.
-  commandPlayer("pauseVideo");
+  /*
+    Order is the whole trick here, and getting it wrong is what made the first
+    version blurry: the embed picks its resolution from the size of the player
+    element, so a phone-sized player is being served a phone-sized stream.
+    Pausing first -- which is what this used to do -- freezes that low
+    resolution and then blows it up. Enlarging first lets YouTube switch up,
+    and only then is there a frame worth keeping.
+  */
   document.documentElement.setAttribute(ATTR, "");
-  mountLayer(message, dir);
+  mountLayer(copy.preparing, copy.dir, { fade: false });
 
-  // Real fullscreen also takes the browser's address bar out of the shot.
-  // iOS Safari refuses it for anything but a video element, which is exactly
-  // why the CSS below stands on its own rather than depending on this.
+  // Fullscreen also takes the address bar out of the shot, and on Android it
+  // is what makes the orientation lock below legal. iOS refuses both for a
+  // non-video element, so neither is allowed to be load-bearing.
   try {
     await document.getElementById("persistent-player")?.requestFullscreen?.({
       navigationUI: "hide",
     });
   } catch {
-    /* the full-viewport CSS is already applied */
+    /* the full-viewport CSS already applied above is the fallback */
   }
+  const turned = await faceLandscape();
+
+  // Deprecated but still honoured as a hint; the size change above is what
+  // really moves the needle, and this nudges the player to act on it now
+  // rather than after several more seconds of playback.
+  commandPlayer("setPlaybackQuality", ["highres"]);
+  commandPlayer("playVideo");
+
+  // Long enough for the player to fetch and decode at the new size.
+  await wait(1800);
+
+  // Playing on to re-buffer drifted away from the requested moment, so come
+  // back to it before freezing.
+  commandPlayer("seekTo", [at, true]);
+  await wait(700);
+  commandPlayer("pauseVideo");
+
+  const needsTurn = !turned && isPortrait();
+  setLayerMessage(needsTurn ? `${copy.ready} ${copy.rotate}` : copy.ready);
 }

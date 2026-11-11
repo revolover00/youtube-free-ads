@@ -265,13 +265,18 @@ export default function ScreenshotDialog({
     still works perfectly -- it just needs our interface out of the picture.
   */
   const prepareForPhoneShot = () => {
+    const at = getTimeRef.current?.() ?? time;
     onClose();
-    void enterShotMode(
-      isAr
-        ? "الفيديو واقف على اللحظة دي. خد لقطة شاشة بزراير تليفونك دلوقتي — وبعدين دوس في أي حتة ترجع."
-        : "Paused on your moment. Take a screenshot with your phone's buttons now — then tap anywhere to go back.",
-      isAr ? "rtl" : "ltr",
-    );
+    void enterShotMode(at, {
+      dir: isAr ? "rtl" : "ltr",
+      preparing: isAr ? "بظبّط أعلى جودة ممكنة…" : "Pushing the player up to its best quality…",
+      ready: isAr
+        ? "جاهز على اللحظة دي. خد لقطة شاشة بزراير تليفونك دلوقتي، وبعدين دوس في أي حتة ترجع."
+        : "Ready, paused on your moment. Take a screenshot with your phone's buttons now, then tap anywhere to go back.",
+      rotate: isAr
+        ? "لفّ التليفون بالعرض الأول — الصورة هتبقى أكبر ٣ مرات."
+        : "Turn the phone sideways first — the frame comes out about three times bigger.",
+    });
   };
 
   /** The rough-but-instant preview, now that it is never forced on anyone. */
@@ -431,8 +436,8 @@ export default function ScreenshotDialog({
               </p>
               <p className="mt-1 text-[12px] leading-[17px] text-yt-sub">
                 {isAr
-                  ? "هوقّف الفيديو على اللحظة دي بالظبط وأفرد الصورة على الشاشة كلها وأشيل كل حاجة من قدامك. بعدها خد لقطة شاشة عادي — هتطلع بدقة شاشتك الكاملة."
-                  : "The video pauses on this exact moment, fills the whole screen, and everything else gets out of the way. Then take a screenshot as usual — at your screen's full resolution."}
+                  ? "هكبّر الصورة على الشاشة كلها الأول علشان يوتيوب يرفع الجودة، وألفّ التليفون بالعرض لو ينفع، وبعدين أرجع للحظة دي بالظبط وأوقّف. ساعتها خد لقطة شاشة عادي."
+                  : "The player is enlarged first so YouTube switches up to a higher resolution, the phone is turned sideways where that is allowed, and only then does it return to this exact moment and pause. Then take a screenshot as usual."}
               </p>
               <button
                 type="button"
