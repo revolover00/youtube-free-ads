@@ -6,6 +6,7 @@ import {
   Copy,
   Download,
   Loader2,
+  RotateCw,
   Share2,
   Sparkles,
   X,
@@ -404,10 +405,27 @@ export default function ScreenshotDialog({
                   ? "لو صورة غلاف الفيديو تنفعك، تقدر تعرضها — بس خلي بالك إنها مش اللحظة اللي إنت واقف عندها."
                   : "If the video's cover image is useful to you, you can show it — but it is not the moment you are paused on."}
               </p>
+              {/*
+                Each attempt opens a brand-new YouTube session, so a second
+                press is a genuinely new roll rather than a repeat of the same
+                failed request. Without this a phone had no way to retry at
+                all -- the only retry lived inside the screen-capture card,
+                which a phone never sees.
+              */}
+              <button
+                type="button"
+                onClick={runQuick}
+                disabled={busy}
+                className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-full bg-yt-text px-4 text-[13px] font-medium text-yt-bg hover:bg-white disabled:opacity-50"
+              >
+                <RotateCw className="h-4 w-4" />
+                {isAr ? "حاول تاني" : "Try again"}
+              </button>
               <button
                 type="button"
                 onClick={() => setPosterAccepted(true)}
-                className="mt-2 inline-flex h-9 items-center rounded-full px-3 text-[13px] text-yt-sub hover:bg-yt-hover hover:text-yt-text"
+                disabled={busy}
+                className="mt-2 ms-2 inline-flex h-9 items-center rounded-full px-3 text-[13px] text-yt-sub hover:bg-yt-hover hover:text-yt-text disabled:opacity-50"
               >
                 {isAr ? "اعرض صورة الغلاف بدل كده" : "Show the cover image instead"}
               </button>
@@ -462,17 +480,25 @@ export default function ScreenshotDialog({
             </div>
           )}
 
-          <p className="mt-2.5 text-[13px] text-yt-sub">
-            {result && !posterIsUseless ? (
-              <>
-                {fmtDuration(Math.round(result.at)) || "0:00"}
-                {" · "}
-                {result.nativeWidth}×{result.nativeHeight}
-              </>
-            ) : (
-              t("screenshotHint")
-            )}
-          </p>
+          {/*
+            "Captured from the moment you are watching" is a promise about what
+            is coming. Once we have had to say the moment is unreachable it
+            becomes a flat contradiction sitting directly under the apology, so
+            it is dropped rather than restated.
+          */}
+          {!posterIsUseless && (
+            <p className="mt-2.5 text-[13px] text-yt-sub">
+              {result ? (
+                <>
+                  {fmtDuration(Math.round(result.at)) || "0:00"}
+                  {" · "}
+                  {result.nativeWidth}×{result.nativeHeight}
+                </>
+              ) : (
+                t("screenshotHint")
+              )}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 px-5 py-4">

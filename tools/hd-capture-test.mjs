@@ -507,6 +507,26 @@ try {
     false,
   );
 
+  // The dialog pasted back by the user ended on "captured from the moment you
+  // are watching", sitting directly under the sentence saying that moment is
+  // unreachable. A dialog must not contradict itself in its own footer.
+  check(
+    "the dialog does not re-promise the moment it just said it cannot reach",
+    /captured from the moment you are watching|اللقطة من اللحظة التي تشاهدها الآن/i.test(
+      await phoneText(),
+    ),
+    false,
+  );
+  check(
+    "a phone can try again, since every attempt is a fresh session",
+    await page.evaluate(() =>
+      [...document.querySelectorAll('[role="dialog"] button')].some((b) =>
+        /try again|حاول تاني/i.test(b.textContent ?? ""),
+      ),
+    ),
+    true,
+  );
+
   const revealed = await page.evaluate(() => {
     const btn = [...document.querySelectorAll('[role="dialog"] button')].find((b) =>
       /show the cover image instead|اعرض صورة الغلاف بدل كده/i.test(b.textContent ?? ""),
