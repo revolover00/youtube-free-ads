@@ -192,8 +192,17 @@ export default function ScreenshotDialog({
     setCopied(false);
     setCaptionCard(false);
     setHdNotice(null);
-    const startTier: CaptureTier = isHdCaptureSupported() && hdHasWorked() ? "hd" : "quick";
+    const canHd = isHdCaptureSupported();
+    const startTier: CaptureTier = canHd ? "hd" : "quick";
     setTier(startTier);
+
+    // Where the real frame is reachable, do not open with the storyboard.
+    // That tile is 160×90 and sits on a 2–10 second grid, so leading with it
+    // presents an approximation as though it were the answer — which is
+    // exactly the complaint it generates. Offer the true capture first and
+    // make the rough preview an explicit choice.
+    if (canHd && !hdHasWorked()) return;
+
     void runRef.current(startTier, false);
   }, [open]);
 
@@ -226,6 +235,14 @@ export default function ScreenshotDialog({
     if (busy) return;
     setTier("hd");
     void run("hd", captionCard);
+  };
+
+  /** The rough-but-instant preview, now that it is never forced on anyone. */
+  const runQuick = () => {
+    if (busy) return;
+    setHdNotice(null);
+    setTier("quick");
+    void run("quick", captionCard);
   };
 
   const onToggleCard = () => {
@@ -313,6 +330,24 @@ export default function ScreenshotDialog({
             </div>
           )}
 
+          {/*
+            The storyboard is YouTube's own scrubbing strip, not a frame of the
+            video: the largest tile it publishes is about 160×90 and the tiles
+            sit on a 2–10 second grid. Handing that over unlabelled reads as a
+            broken screenshot, when it is really the best the server is allowed
+            to see.
+          */}
+          {result?.source === "storyboard" && (
+            <div className="mt-2.5 flex items-start gap-2 rounded-lg bg-yt-surface px-3 py-2 text-[13px] leading-[18px] text-yt-sub">
+              <AlertTriangle className="mt-px h-4 w-4 shrink-0" />
+              <span className="min-w-0">
+                {isAr
+                  ? "دي معاينة من شريط التمرير بتاع يوتيوب: أكبر مقاس متاح حوالي 160×90، واللقطات كل ٢ إلى ١٠ ثواني — فهي قريبة من اللحظة مش هي بالظبط."
+                  : "This comes from YouTube's scrubbing strip: about 160×90 at best, on a 2–10 second grid — close to your moment, not exactly it."}
+              </span>
+            </div>
+          )}
+
           {/* The user shared a whole screen or window, so the frame is not the
               player. Saying so beats handing them their desktop in silence. */}
           {result?.source === "display" && result.cropped === false && (
@@ -356,6 +391,18 @@ export default function ScreenshotDialog({
                 <Camera className="h-4 w-4" />
                 {isAr ? "التقط الإطار الحقيقي" : "Capture the real frame"}
               </button>
+              {/* Without this the no-image state is a dead end for anyone who
+                  does not want to share a tab at all. */}
+              {!result && (
+                <button
+                  type="button"
+                  onClick={runQuick}
+                  disabled={busy}
+                  className="mt-2 ms-2 inline-flex h-9 items-center rounded-full px-3 text-[13px] text-yt-sub hover:bg-yt-hover hover:text-yt-text disabled:opacity-50"
+                >
+                  {isAr ? "معاينة تقريبية بدل كده" : "Rough preview instead"}
+                </button>
+              )}
               {hdNotice && (
                 <p className="mt-2 text-[12px] leading-[17px] text-[#ff8a80]">{hdNotice}</p>
               )}

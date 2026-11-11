@@ -65,6 +65,17 @@ async function captureAt(seconds) {
     return true;
   });
   if (!clicked) return { error: "no button" };
+  await new Promise((r) => setTimeout(r, 1200));
+
+  // On a browser that can grab the real frame the dialog now opens on the
+  // offer rather than on a storyboard approximation, so this harness -- which
+  // exists to verify storyboard tile addressing -- has to ask for it.
+  await page.evaluate(() => {
+    const b = [...document.querySelectorAll('[role="dialog"] button')].find((x) =>
+      /rough preview instead|معاينة تقريبية بدل كده/i.test(x.textContent || ""),
+    );
+    if (b) b.click();
+  });
   await new Promise((r) => setTimeout(r, 3000));
 
   return await page.evaluate(() => {

@@ -176,9 +176,14 @@ async function settle(page, { timeout = 30000 } = {}) {
         hasImage: !!dialog?.querySelector("img"),
         spinning: !!dialog?.querySelector(".animate-spin"),
         visible: overlay ? getComputedStyle(overlay).visibility === "visible" : false,
+        offering: [...(dialog?.querySelectorAll("button") ?? [])].some((b) =>
+          /capture the real frame|التقط الإطار الحقيقي/i.test(b.textContent ?? ""),
+        ),
       };
     });
-    if (state.hasImage && state.visible && !state.spinning) return;
+    // Two legitimate resting states: an image is ready, or -- on a first visit
+    // -- the dialog is deliberately holding nothing but the offer to capture.
+    if (state.visible && !state.spinning && (state.hasImage || state.offering)) return;
     if (Date.now() > deadline) throw new Error(`capture never settled: ${JSON.stringify(state)}`);
     await new Promise((r) => setTimeout(r, 250));
   }
@@ -199,7 +204,21 @@ async function openDialog(page, { proven }) {
     return true;
   });
   if (!opened) throw new Error("screenshot button not found");
-  await page.waitForSelector('[role="dialog"] img', { timeout: 20000 });
+  // A first visit on a capable browser deliberately shows no image at all --
+  // offering the real capture instead of leading with a 160x90 approximation --
+  // so wait for the dialog, then for whichever of the two states it settles in.
+  await page.waitForSelector('[role="dialog"]', { timeout: 20000 });
+  await page.waitForFunction(
+    () => {
+      const dlg = document.querySelector('[role="dialog"]');
+      if (!dlg) return false;
+      if (dlg.querySelector("img")) return true;
+      return [...dlg.querySelectorAll("button")].some((b) =>
+        /capture the real frame|التقط الإطار الحقيقي/i.test(b.textContent ?? ""),
+      );
+    },
+    { timeout: 20000 },
+  );
   await settle(page);
 }
 
@@ -348,6 +367,22 @@ try {
     "nothing is remembered before it has ever worked",
     await page.evaluate((k) => localStorage.getItem(k), HD_OK_KEY),
     null,
+  );
+  // The whole point of the change: a 160x90 storyboard tile from a 2-10s grid
+  // must not be presented as the answer before the real frame is even offered.
+  check(
+    "no approximation is shown as though it were the screenshot",
+    await page.evaluate(() => !document.querySelector('[role="dialog"] img')),
+    true,
+  );
+  check(
+    "the rough preview is still reachable for anyone who wants it",
+    await page.evaluate(() =>
+      [...document.querySelectorAll('[role="dialog"] button')].some((b) =>
+        /rough preview instead|معاينة تقريبية بدل كده/i.test(b.textContent ?? ""),
+      ),
+    ),
+    true,
   );
 
   await clickCaptureCta(page);
