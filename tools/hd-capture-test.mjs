@@ -582,6 +582,46 @@ try {
   });
   check("a tap anywhere gives the app back", exited.disarmed && exited.layerGone, true);
 
+  /*
+    The blurriness was upscaling, not a missing feature: a 720p source
+    stretched across the whole screen interpolates instead of adding detail.
+    sizeToNative is the fix, so it gets measured directly -- it is pure
+    geometry and needs no YouTube.
+  */
+  const geometry = await page.evaluate(async () => {
+    const mod = await import("/src/lib/shotMode.ts");
+    const dpr = window.devicePixelRatio || 1;
+    document.documentElement.setAttribute("data-shot-mode", "");
+
+    // A 720p source on a screen with room to spare: one video pixel per
+    // device pixel, never more.
+    const native = mod.sizeToNative(720);
+    const cssH = document.documentElement.style.getPropertyValue("--yt-shot-h");
+
+    // A source taller than the screen must shrink, never overflow.
+    const huge = mod.sizeToNative(4320);
+    const fits = huge.width <= innerWidth * dpr + 1 && huge.height <= innerHeight * dpr + 1;
+
+    mod.exitShotMode();
+    return {
+      native,
+      cssH,
+      fits,
+      noUpscale: native.height <= 720,
+      exactWhenItFits: native.height === 720,
+      cleared: !document.documentElement.style.getPropertyValue("--yt-shot-h"),
+      roomy: innerHeight * dpr > 720,
+    };
+  });
+  check(
+    "a 720p frame is rendered at 720 device pixels, not stretched past them",
+    geometry.roomy ? geometry.exactWhenItFits : geometry.noUpscale,
+    true,
+  );
+  check("the frame is never upscaled beyond the source", geometry.noUpscale, true);
+  check("an oversized source is shrunk to fit the screen", geometry.fits, true);
+  check("leaving shot mode clears the sizing", geometry.cleared, true);
+
   await openDialog(page, { proven: true });
   await settle(page);
 

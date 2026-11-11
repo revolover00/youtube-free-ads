@@ -488,17 +488,22 @@ html[data-shot-mode] body {
 }
 
 html[data-shot-mode] #persistent-player {
+  /*
+    Centred at the video's own resolution rather than stretched edge to edge:
+    upscaling a 720p source across a 2400px screen adds no detail, it only
+    interpolates. sizeToNative() sets the two variables; before it knows the
+    real quality the fallback fills the screen.
+  */
   position: fixed !important;
-  inset: 0 !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100vw !important;
-  height: 100dvh !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: var(--yt-shot-w, 100vw) !important;
+  height: var(--yt-shot-h, 100dvh) !important;
   max-width: none !important;
   max-height: none !important;
   z-index: 2147483000 !important;
   opacity: 1 !important;
-  transform: none !important;
   border-radius: 0 !important;
   background: #000 !important;
   pointer-events: none !important;

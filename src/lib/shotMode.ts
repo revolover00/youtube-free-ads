@@ -14,15 +14,15 @@
  *   - The player is a cross-origin iframe, so its pixels are unreadable from
  *     JavaScript, and the muxed streams are signature-locked.
  *
- * What remains is the screenshot button already built into the phone, which
- * captures the real frame at the screen's full resolution. The only thing
- * standing between the user and a good shot is our own interface, so this
- * removes it: pause on the exact moment, fill the screen with the player,
- * and get out of the way.
+ * What remains is the screenshot button already built into the phone. The
+ * work here is to make what it photographs as sharp as the video actually
+ * allows — which is a question of resolution, not of screen area.
  */
 
 const ATTR = "data-shot-mode";
 const LAYER_ID = "yt-shot-layer";
+const CARD_ID = "yt-shot-card";
+const BACKDROP_ID = "yt-shot-backdrop";
 
 /** The YouTube embed takes commands over postMessage; this is how Watch.tsx drives it. */
 function commandPlayer(func: string, args: unknown[] = []): void {
@@ -32,11 +32,81 @@ function commandPlayer(func: string, args: unknown[] = []): void {
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** YouTube reports quality by name; these are the line counts behind the names. */
+const QUALITY_LINES: Record<string, number> = {
+  tiny: 144,
+  small: 240,
+  medium: 360,
+  large: 480,
+  hd720: 720,
+  hd1080: 1080,
+  hd1440: 1440,
+  hd2160: 2160,
+  highres: 2160,
+};
+
+interface PlayerInfo {
+  currentTime?: number;
+  playbackQuality?: string;
+  availableQualityLevels?: string[];
+}
+
+/** YouTubePlayer.tsx already re-broadcasts every infoDelivery payload. */
+function watchPlayerInfo(onInfo: (info: PlayerInfo) => void): () => void {
+  const handler = (e: Event) => onInfo((e as CustomEvent<PlayerInfo>).detail ?? {});
+  window.addEventListener("yt:player-info", handler);
+  return () => window.removeEventListener("yt:player-info", handler);
+}
+
+export function isShotModeActive(): boolean {
+  return typeof document !== "undefined" && document.documentElement.hasAttribute(ATTR);
+}
+
+export function exitShotMode(): void {
+  if (typeof document === "undefined") return;
+  document.documentElement.removeAttribute(ATTR);
+  document.documentElement.style.removeProperty("--yt-shot-w");
+  document.documentElement.style.removeProperty("--yt-shot-h");
+  document.getElementById(LAYER_ID)?.remove();
+  document.getElementById(BACKDROP_ID)?.remove();
+  if (document.fullscreenElement) {
+    void document.exitFullscreen?.().catch(() => {
+      /* already gone */
+    });
+  }
+}
+
+/**
+ * Size the player so one video pixel lands on one device pixel.
+ *
+ * Stretching a 720p video across a 2400px-wide landscape screen does not add
+ * detail, it just interpolates — which is exactly what "the quality is
+ * rubbish" looks like. Rendering at the source's own resolution (or smaller,
+ * when the screen is smaller) is the sharpest a screenshot can possibly be.
+ *
+ * @returns the device-pixel size the frame will occupy in the screenshot.
+ */
+export function sizeToNative(lines: number): { width: number; height: number } {
+  const dpr = window.devicePixelRatio || 1;
+  let h = lines / dpr;
+  let w = (h * 16) / 9;
+
+  // Never grow past the screen; downscaling stays sharp, upscaling does not.
+  const maxW = window.innerWidth;
+  const maxH = window.innerHeight;
+  const shrink = Math.min(1, maxW / w, maxH / h);
+  w *= shrink;
+  h *= shrink;
+
+  document.documentElement.style.setProperty("--yt-shot-w", `${Math.round(w)}px`);
+  document.documentElement.style.setProperty("--yt-shot-h", `${Math.round(h)}px`);
+  return { width: Math.round(w * dpr), height: Math.round(h * dpr) };
+}
+
 /**
  * A 16:9 video inside a portrait phone only gets about a quarter of the
- * screen, so the screenshot is mostly black bars. Landscape hands the same
- * video roughly three times the pixels, which is the difference between a
- * usable frame and a thumbnail.
+ * screen. Landscape leaves room to show it at full resolution rather than a
+ * downscaled slice, so it is worth asking for.
  */
 async function faceLandscape(): Promise<boolean> {
   try {
@@ -55,44 +125,41 @@ function isPortrait(): boolean {
   return window.innerHeight > window.innerWidth;
 }
 
-export function isShotModeActive(): boolean {
-  return typeof document !== "undefined" && document.documentElement.hasAttribute(ATTR);
-}
-
-export function exitShotMode(): void {
-  if (typeof document === "undefined") return;
-  document.documentElement.removeAttribute(ATTR);
-  document.getElementById(LAYER_ID)?.remove();
-  if (document.fullscreenElement) {
-    void document.exitFullscreen?.().catch(() => {
-      /* already gone */
-    });
-  }
+/**
+ * Swap the text without remounting, so each stage can report itself in place
+ * and only the final message starts counting down to invisibility.
+ */
+function setLayerMessage(message: string, { fade } = { fade: true }): void {
+  const card = document.getElementById(CARD_ID);
+  if (!card) return;
+  card.textContent = message;
+  if (!fade) return;
+  // Long enough to read, short enough that nobody is still waiting for it.
+  window.setTimeout(() => {
+    card.style.opacity = "0";
+  }, 3000);
 }
 
 /**
  * The instruction has to be read and then be gone, because anything still on
- * screen lands in the user's photo. It fades itself out and leaves behind an
- * invisible catcher so a tap anywhere returns to the app.
+ * screen lands in the user's photo. It leaves behind an invisible catcher so
+ * a tap anywhere returns to the app.
  */
-const CARD_ID = "yt-shot-card";
-
-/**
- * Swap the text without remounting, so the preparing notice can become the
- * instruction in place, and only then start counting down to invisibility.
- */
-function setLayerMessage(message: string): void {
-  const card = document.getElementById(CARD_ID);
-  if (!card) return;
-  card.textContent = message;
-  // Long enough to read, short enough that nobody is still waiting for it.
-  window.setTimeout(() => {
-    card.style.opacity = "0";
-  }, 2800);
-}
-
-function mountLayer(message: string, dir: "rtl" | "ltr", { fade } = { fade: true }): void {
+function mountLayer(message: string, dir: "rtl" | "ltr"): void {
   document.getElementById(LAYER_ID)?.remove();
+  document.getElementById(BACKDROP_ID)?.remove();
+
+  // The player no longer covers the whole screen once it is sized to the
+  // video's own resolution, so the rest of the app needs hiding behind this.
+  const backdrop = document.createElement("div");
+  backdrop.id = BACKDROP_ID;
+  Object.assign(backdrop.style, {
+    position: "fixed",
+    inset: "0",
+    background: "#000",
+    zIndex: "2147482999",
+  } satisfies Partial<CSSStyleDeclaration>);
+  document.body.appendChild(backdrop);
 
   const layer = document.createElement("div");
   layer.id = LAYER_ID;
@@ -104,8 +171,8 @@ function mountLayer(message: string, dir: "rtl" | "ltr", { fade } = { fade: true
     zIndex: "2147483647",
     display: "grid",
     placeItems: "center",
+    // Nothing here may tint the screenshot, only catch the exit tap.
     background: "transparent",
-    // Nothing here may intercept the screenshot itself, only the exit tap.
     cursor: "pointer",
   } satisfies Partial<CSSStyleDeclaration>);
 
@@ -128,20 +195,14 @@ function mountLayer(message: string, dir: "rtl" | "ltr", { fade } = { fade: true
   layer.appendChild(card);
   layer.addEventListener("click", exitShotMode, { once: true });
   document.body.appendChild(layer);
-
-  if (fade) {
-    window.setTimeout(() => {
-      card.style.opacity = "0";
-    }, 2800);
-  }
 }
 
 export interface ShotCopy {
-  /** Shown while the player is being pushed up to a usable resolution. */
+  /** Shown while the player is being pushed up to its best resolution. */
   preparing: string;
-  /** Shown once the frame is ready to be photographed. */
-  ready: string;
-  /** Appended when the phone is still portrait and could not be turned for them. */
+  /** Built once the real resolution is known. */
+  ready: (size: string) => string;
+  /** Appended when the phone is still portrait and could not be turned. */
   rotate: string;
   dir: "rtl" | "ltr";
 }
@@ -152,44 +213,57 @@ export interface ShotCopy {
 export async function enterShotMode(at: number, copy: ShotCopy): Promise<void> {
   if (typeof document === "undefined") return;
 
-  /*
-    Order is the whole trick here, and getting it wrong is what made the first
-    version blurry: the embed picks its resolution from the size of the player
-    element, so a phone-sized player is being served a phone-sized stream.
-    Pausing first -- which is what this used to do -- freezes that low
-    resolution and then blows it up. Enlarging first lets YouTube switch up,
-    and only then is there a frame worth keeping.
-  */
   document.documentElement.setAttribute(ATTR, "");
-  mountLayer(copy.preparing, copy.dir, { fade: false });
+  mountLayer(copy.preparing, copy.dir);
 
-  // Fullscreen also takes the address bar out of the shot, and on Android it
-  // is what makes the orientation lock below legal. iOS refuses both for a
-  // non-video element, so neither is allowed to be load-bearing.
+  let latest: PlayerInfo = {};
+  const stopWatching = watchPlayerInfo((info) => {
+    latest = { ...latest, ...info };
+  });
+
   try {
-    await document.getElementById("persistent-player")?.requestFullscreen?.({
-      navigationUI: "hide",
-    });
-  } catch {
-    /* the full-viewport CSS already applied above is the fallback */
+    // Fullscreen takes the address bar out of the shot and, on Android, is
+    // what makes the orientation lock below legal. iOS refuses both for a
+    // non-video element, so neither is allowed to be load-bearing.
+    try {
+      await document.getElementById("persistent-player")?.requestFullscreen?.({
+        navigationUI: "hide",
+      });
+    } catch {
+      /* the CSS layout stands on its own */
+    }
+    const turned = await faceLandscape();
+
+    /*
+      Seeking is what made the first attempt blurry in a second way: YouTube
+      refills its buffer with a low-quality segment after every seek, so
+      pausing straight afterwards freezes exactly that. Playing *through* the
+      moment instead leaves it buffered at full quality, and the seek back
+      then lands on data already downloaded.
+    */
+    commandPlayer("setPlaybackQuality", ["highres"]);
+    commandPlayer("seekTo", [Math.max(0, at - 3), true]);
+    commandPlayer("playVideo");
+
+    const deadline = Date.now() + 9000;
+    while (Date.now() < deadline) {
+      await wait(200);
+      if ((latest.currentTime ?? -1) > at + 0.4) break;
+    }
+
+    commandPlayer("seekTo", [at, true]);
+    await wait(500);
+    commandPlayer("pauseVideo");
+
+    // Only now is the real ceiling known, so only now can the frame be sized
+    // honestly — and the user told what they are actually getting.
+    const lines = QUALITY_LINES[latest.playbackQuality ?? ""] ?? 0;
+    const size = lines ? sizeToNative(lines) : null;
+    const label = size ? `${size.width}×${size.height}` : "";
+
+    const needsTurn = !turned && isPortrait();
+    setLayerMessage(needsTurn ? `${copy.ready(label)} ${copy.rotate}` : copy.ready(label));
+  } finally {
+    stopWatching();
   }
-  const turned = await faceLandscape();
-
-  // Deprecated but still honoured as a hint; the size change above is what
-  // really moves the needle, and this nudges the player to act on it now
-  // rather than after several more seconds of playback.
-  commandPlayer("setPlaybackQuality", ["highres"]);
-  commandPlayer("playVideo");
-
-  // Long enough for the player to fetch and decode at the new size.
-  await wait(1800);
-
-  // Playing on to re-buffer drifted away from the requested moment, so come
-  // back to it before freezing.
-  commandPlayer("seekTo", [at, true]);
-  await wait(700);
-  commandPlayer("pauseVideo");
-
-  const needsTurn = !turned && isPortrait();
-  setLayerMessage(needsTurn ? `${copy.ready} ${copy.rotate}` : copy.ready);
 }

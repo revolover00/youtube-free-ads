@@ -270,12 +270,13 @@ export default function ScreenshotDialog({
     void enterShotMode(at, {
       dir: isAr ? "rtl" : "ltr",
       preparing: isAr ? "بظبّط أعلى جودة ممكنة…" : "Pushing the player up to its best quality…",
-      ready: isAr
-        ? "جاهز على اللحظة دي. خد لقطة شاشة بزراير تليفونك دلوقتي، وبعدين دوس في أي حتة ترجع."
-        : "Ready, paused on your moment. Take a screenshot with your phone's buttons now, then tap anywhere to go back.",
+      ready: (size: string) =>
+        isAr
+          ? `جاهز على اللحظة دي${size ? ` — الإطار ${size}، وديه أعلى جودة في الفيديو نفسه` : ""}. خد لقطة شاشة دلوقتي، وبعدين دوس في أي حتة ترجع.`
+          : `Ready, paused on your moment${size ? ` — the frame is ${size}, which is all the video itself carries` : ""}. Take a screenshot now, then tap anywhere to go back.`,
       rotate: isAr
-        ? "لفّ التليفون بالعرض الأول — الصورة هتبقى أكبر ٣ مرات."
-        : "Turn the phone sideways first — the frame comes out about three times bigger.",
+        ? "لفّ التليفون بالعرض علشان ياخد الإطار بمقاسه الكامل."
+        : "Turn the phone sideways so there is room for the frame at full size.",
     });
   };
 
@@ -436,8 +437,8 @@ export default function ScreenshotDialog({
               </p>
               <p className="mt-1 text-[12px] leading-[17px] text-yt-sub">
                 {isAr
-                  ? "هكبّر الصورة على الشاشة كلها الأول علشان يوتيوب يرفع الجودة، وألفّ التليفون بالعرض لو ينفع، وبعدين أرجع للحظة دي بالظبط وأوقّف. ساعتها خد لقطة شاشة عادي."
-                  : "The player is enlarged first so YouTube switches up to a higher resolution, the phone is turned sideways where that is allowed, and only then does it return to this exact moment and pause. Then take a screenshot as usual."}
+                  ? "هرفع الجودة لأقصى حاجة في الفيديو، وأعدّي على اللحظة دي وهي محمّلة بالجودة دي، وبعدين أرجعلها وأوقّف — وأعرضها بمقاسها الأصلي من غير تكبير يبوّظها. ساعتها خد لقطة شاشة عادي."
+                  : "The quality is pushed to whatever the video actually carries, the moment is played through so it is buffered at that quality, and then it is frozen and shown at its true size — no upscaling to soften it. Then take a screenshot as usual."}
               </p>
               <button
                 type="button"
