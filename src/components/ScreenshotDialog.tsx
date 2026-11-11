@@ -208,9 +208,14 @@ export default function ScreenshotDialog({
     // Where the real frame is reachable, do not open with the storyboard.
     // That tile is 160×90 and sits on a 2–10 second grid, so leading with it
     // presents an approximation as though it were the answer — which is
-    // exactly the complaint it generates. Offer the true capture first and
-    // make the rough preview an explicit choice.
-    if (canHd && !hdHasWorked()) return;
+    // exactly the complaint it generates. Offer the true route first and make
+    // the rough preview an explicit choice.
+    //
+    // A phone has a true route too: its own screenshot button, via shot mode.
+    // Applying this rule only where getDisplayMedia exists is what kept
+    // opening every phone directly onto a 160×90 scrubber tile, which is the
+    // rotten picture this feature keeps being judged by.
+    if (!canHd || !hdHasWorked()) return;
 
     void runRef.current(startTier, false);
   }, [open]);
@@ -354,7 +359,16 @@ export default function ScreenshotDialog({
                           : "YouTube refused the server this moment. On a phone there is still a way to get it at full resolution — below."
                       : failed
                         ? t("screenshotFailed")
-                        : t("screenshotHint")}
+                        : // Nothing has been fetched yet. On a desktop the
+                          // capture button below can still deliver the moment,
+                          // so promising it is honest. On a phone it cannot,
+                          // and the promise would sit directly above a card
+                          // explaining exactly that.
+                          !hdAvailable
+                          ? isAr
+                            ? "اللقطة دي بتتاخد من زرار التليفون نفسه — الخطوات تحت."
+                            : "This one is taken with the phone's own button — the steps are below."
+                          : t("screenshotHint")}
                   </span>
                 )}
               </div>
@@ -429,8 +443,14 @@ export default function ScreenshotDialog({
             the frame, at full screen resolution, from the screenshot button
             it already has. So that is what this leads with, instead of an
             apology with nothing behind it.
+
+            It used to render only when the server fell back to the poster, so
+            on every video whose storyboard did come through, the phone was
+            shown a 160×90 tile and never told that a real frame was one tap
+            away. The route out is offered whatever the server returned --
+            only a true screen grab retires it.
           */}
-          {posterIsUseless && !hdAvailable && (
+          {!hdAvailable && result?.source !== "display" && (
             <div className="mt-2.5 rounded-lg bg-yt-surface px-3 py-2.5">
               <p className="text-[13px] font-medium leading-[18px] text-yt-text">
                 {isAr
@@ -452,13 +472,20 @@ export default function ScreenshotDialog({
               </button>
               <div className="mt-2.5 border-t border-yt-border pt-2.5">
                 <p className="text-[12px] leading-[17px] text-yt-sub">
-                  {isAr
-                    ? "أو جرّب السيرفر تاني — كل محاولة بتفتح جلسة يوتيوب جديدة، فساعات بتعدّي."
-                    : "Or try the server again — each attempt opens a fresh YouTube session, so it sometimes gets through."}
+                  {result
+                    ? isAr
+                      ? "أو جرّب السيرفر تاني — كل محاولة بتفتح جلسة يوتيوب جديدة، فساعات بتعدّي."
+                      : "Or try the server again — each attempt opens a fresh YouTube session, so it sometimes gets through."
+                    : isAr
+                      ? "أو خد المعاينة السريعة من شريط التمرير: بتيجي في ثانية، بس مقاسها 160×90 وقريبة من اللحظة مش هي بالظبط."
+                      : "Or take the quick scrubber preview: it arrives in a second, but it is 160×90 and close to your moment rather than exactly it."}
                 </p>
                 {/*
                   Without this a phone had no retry at all: the only one lived
                   inside the screen-capture card, which a phone never renders.
+                  Before anything has been fetched the same button is the
+                  opt-in to the rough preview, named for what it really is so
+                  that choosing it is a decision rather than a surprise.
                 */}
                 <button
                   type="button"
@@ -467,16 +494,29 @@ export default function ScreenshotDialog({
                   className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] text-yt-sub hover:bg-yt-hover hover:text-yt-text disabled:opacity-50"
                 >
                   <RotateCw className="h-4 w-4" />
-                  {isAr ? "حاول تاني" : "Try again"}
+                  {result
+                    ? isAr
+                      ? "حاول تاني"
+                      : "Try again"
+                    : isAr
+                      ? "معاينة تقريبية بدل كده"
+                      : "Rough preview instead"}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setPosterAccepted(true)}
-                  disabled={busy}
-                  className="mt-2 ms-1 inline-flex h-9 items-center rounded-full px-3 text-[13px] text-yt-sub hover:bg-yt-hover hover:text-yt-text disabled:opacity-50"
-                >
-                  {isAr ? "اعرض صورة الغلاف بدل كده" : "Show the cover image instead"}
-                </button>
+                {/*
+                  Only meaningful once the server has actually fallen back to
+                  the cover image. Offering it before anything was fetched
+                  advertises a failure that has not happened.
+                */}
+                {result?.source === "poster" && !posterAccepted && (
+                  <button
+                    type="button"
+                    onClick={() => setPosterAccepted(true)}
+                    disabled={busy}
+                    className="mt-2 ms-1 inline-flex h-9 items-center rounded-full px-3 text-[13px] text-yt-sub hover:bg-yt-hover hover:text-yt-text disabled:opacity-50"
+                  >
+                    {isAr ? "اعرض صورة الغلاف بدل كده" : "Show the cover image instead"}
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -533,9 +573,11 @@ export default function ScreenshotDialog({
             "Captured from the moment you are watching" is a promise about what
             is coming. Once we have had to say the moment is unreachable it
             becomes a flat contradiction sitting directly under the apology, so
-            it is dropped rather than restated.
+            it is dropped rather than restated. Same on a phone before anything
+            is fetched: the card above has just explained that this app cannot
+            hand over the frame, and promising it underneath reads as a lie.
           */}
-          {!posterIsUseless && (
+          {!posterIsUseless && (result || hdAvailable) && (
             <p className="mt-2.5 text-[13px] text-yt-sub">
               {result ? (
                 <>

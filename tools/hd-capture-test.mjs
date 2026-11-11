@@ -179,10 +179,13 @@ async function settle(page, { timeout = 30000 } = {}) {
         offering: [...(dialog?.querySelectorAll("button") ?? [])].some((b) =>
           /capture the real frame|التقط الإطار الحقيقي/i.test(b.textContent ?? ""),
         ),
-        // A device with no screen capture can reach neither of those: it rests
-        // on an explanation plus the opt-in to view the cover image.
+        // A device with no screen capture can reach neither of those: it
+        // rests on the route to its own screenshot button, plus the opt-in to
+        // the rough preview or to the cover image.
         explaining: [...(dialog?.querySelectorAll("button") ?? [])].some((b) =>
-          /show the cover image instead|اعرض صورة الغلاف بدل كده/i.test(b.textContent ?? ""),
+          /show the cover image instead|اعرض صورة الغلاف بدل كده|set up the shot|جهّز الشاشة للقطة/i.test(
+            b.textContent ?? "",
+          ),
         ),
       };
     });
@@ -226,7 +229,7 @@ async function openDialog(page, { proven }) {
       if (!dlg) return false;
       if (dlg.querySelector("img")) return true;
       return [...dlg.querySelectorAll("button")].some((b) =>
-        /capture the real frame|التقط الإطار الحقيقي|show the cover image instead|اعرض صورة الغلاف بدل كده/i.test(
+        /capture the real frame|التقط الإطار الحقيقي|show the cover image instead|اعرض صورة الغلاف بدل كده|set up the shot|جهّز الشاشة للقطة/i.test(
           b.textContent ?? "",
         ),
       );
@@ -247,6 +250,25 @@ async function clickQuickPreview(page) {
     return true;
   });
   if (!clicked) throw new Error("rough preview button not found");
+  await settle(page);
+}
+
+/**
+ * Ask the server for the rough preview on a phone. Named "rough preview
+ * instead" before anything has been fetched and "try again" afterwards --
+ * both are the same action, and a regression proof should report a failed
+ * assertion rather than die on a missing selector.
+ */
+async function fetchRoughPreview(page) {
+  const clicked = await page.evaluate(() => {
+    const btn = [...document.querySelectorAll('[role="dialog"] button')].find((b) =>
+      /rough preview instead|معاينة تقريبية بدل كده|try again|حاول تاني/i.test(b.textContent ?? ""),
+    );
+    if (!btn) return false;
+    btn.click();
+    return true;
+  });
+  if (!clicked) throw new Error("neither rough-preview nor try-again button found");
   await settle(page);
 }
 
@@ -518,10 +540,10 @@ try {
     false,
   );
   check(
-    "a phone can try again, since every attempt is a fresh session",
+    "the rough preview is offered by name, not imposed",
     await page.evaluate(() =>
       [...document.querySelectorAll('[role="dialog"] button')].some((b) =>
-        /try again|حاول تاني/i.test(b.textContent ?? ""),
+        /rough preview instead|معاينة تقريبية بدل كده/i.test(b.textContent ?? ""),
       ),
     ),
     true,
@@ -636,6 +658,19 @@ try {
 
   await openDialog(page, { proven: true });
   await settle(page);
+  // Nothing is fetched on a phone until it is asked for, so the cover image
+  // cannot be offered before the server has had its go and fallen back to it.
+  await fetchRoughPreview(page);
+
+  check(
+    "a phone can try again, since every attempt is a fresh session",
+    await page.evaluate(() =>
+      [...document.querySelectorAll('[role="dialog"] button')].some((b) =>
+        /try again|حاول تاني/i.test(b.textContent ?? ""),
+      ),
+    ),
+    true,
+  );
 
   const revealed = await page.evaluate(() => {
     const btn = [...document.querySelectorAll('[role="dialog"] button')].find((b) =>
@@ -656,6 +691,50 @@ try {
     ),
     true,
   );
+  await page.close();
+
+  // ---- 6. A phone whose storyboard DOES come through ---------------------
+  // This is the state the user reported: the server answers, so the dialog
+  // opened straight onto YouTube's scrubbing tile -- 160x90, on a 2-10 second
+  // grid -- and because the shot-mode card only rendered for the poster
+  // fallback, the one route to a real frame was never shown at all.
+  console.log("\na phone is not opened on the 160x90 scrubber tile");
+  page = await newWatchPage(VIDEO, { noScreenCapture: true });
+  await markPlayer(page);
+  await openDialog(page, { proven: true });
+
+  const boardText = () =>
+    page.evaluate(() => document.querySelector('[role="dialog"]')?.innerText ?? "");
+
+  check(
+    "the scrubber tile is not handed over before it is asked for",
+    await page.evaluate(() => !document.querySelector('[role="dialog"] img')),
+    true,
+  );
+  check(
+    "the route to a real frame is what the phone opens on",
+    /set up the shot|جهّز الشاشة للقطة/i.test(await boardText()),
+    true,
+  );
+
+  await fetchRoughPreview(page);
+
+  check(
+    "the rough preview still arrives for anyone who wants it",
+    await page.evaluate(() => !!document.querySelector('[role="dialog"] img')),
+    true,
+  );
+  check(
+    "it is labelled a scrubbing tile rather than the moment",
+    /160×90|scrubbing strip|شريط التمرير/i.test(await boardText()),
+    true,
+  );
+  check(
+    "the real-frame route survives next to it",
+    /set up the shot|جهّز الشاشة للقطة/i.test(await boardText()),
+    true,
+  );
+  check("no screen-capture button is dangled here either", await ctaPresent(page), false);
   await page.close();
 } finally {
   await browser.close();
