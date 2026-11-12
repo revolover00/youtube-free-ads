@@ -1,6 +1,7 @@
 import { useEffect, useRef, useMemo, useState } from "react";
 import { useAppStore } from "../lib/appStore";
 import { useLanguage } from "../lib/i18n";
+import { mirrorSources, type MirrorSource } from "../lib/mirror";
 import {
   DEFAULT_EMBED_HOST,
   embedIsUnreachable,
@@ -59,6 +60,17 @@ export default function YouTubePlayer({
   const [announceHost, setAnnounceHost] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [reprobing, setReprobing] = useState(false);
+  /*
+    When neither embed host answers, the embed is not coming back and the
+    only remaining source of bytes is a front-end the user's own network can
+    still reach. Candidates are walked in order and the <video> element has
+    the final say -- see src/lib/mirror.ts for why this is what is left.
+  */
+  const [sources, setSources] = useState<MirrorSource[]>([]);
+  const [sourceStep, setSourceStep] = useState(0);
+  const [searching, setSearching] = useState(false);
+  const [searchDone, setSearchDone] = useState(false);
+
   const hostRef = useRef(host);
   const reachRef = useRef<ReachReport | null>(null);
   const sawPlayerRef = useRef(false);
@@ -258,6 +270,40 @@ export default function YouTubePlayer({
     };
   }, [videoId, title, t]);
 
+  /*
+    Collect every source worth trying, once, as soon as it is known that no
+    embed host will answer. The Piped instances are asked in parallel -- five
+    stacked timeouts would be half a minute of nothing on screen -- and the
+    Invidious URLs need no asking at all.
+  */
+  useEffect(() => {
+    if (!embedIsUnreachable(reach)) return undefined;
+    let alive = true;
+    setSearching(true);
+    setSearchDone(false);
+    void mirrorSources(videoId)
+      .then((list) => {
+        if (!alive) return;
+        setSources(list);
+        setSourceStep(0);
+      })
+      .finally(() => {
+        if (!alive) return;
+        setSearching(false);
+        setSearchDone(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [reach, videoId]);
+
+  // A new video starts the search over.
+  useEffect(() => {
+    setSources([]);
+    setSearchDone(false);
+    setSourceStep(0);
+  }, [videoId]);
+
   // YouTube IFrame URL parameters
   const params = useMemo(() => {
     const p = new URLSearchParams({
@@ -308,20 +354,60 @@ export default function YouTubePlayer({
       .finally(() => setReprobing(false));
   };
 
+  const current = sources[sourceStep] ?? null;
+  const exhausted = searchDone && !searching && sourceStep >= sources.length;
+
   return (
     <div className={`relative bg-black overflow-hidden select-none ${className}`}>
-      <iframe
-        ref={iframeRef}
-        key={`${videoId}-${autoplay}-${muted}-${host}-${attempt}`}
-        className="w-full h-full border-0 pointer-events-auto"
-        src={`https://${host}/embed/${videoId}?${params.toString()}`}
-        title={title}
-        loading="lazy"
-        onLoad={handleIframeLoad}
-        referrerPolicy="strict-origin-when-cross-origin"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-        allowFullScreen
-      />
+      {/*
+        A blocked embed is not worth rendering: it would sit there as a dead
+        rectangle stealing the space the working player needs.
+      */}
+      {!blocked && (
+        <iframe
+          ref={iframeRef}
+          key={`${videoId}-${autoplay}-${muted}-${host}-${attempt}`}
+          className="w-full h-full border-0 pointer-events-auto"
+          src={`https://${host}/embed/${videoId}?${params.toString()}`}
+          title={title}
+          loading="lazy"
+          onLoad={handleIframeLoad}
+          referrerPolicy="strict-origin-when-cross-origin"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+          allowFullScreen
+        />
+      )}
+
+      {/*
+        The same video, from a front-end this network can still reach. The
+        element is the arbiter: if it cannot play what an instance handed
+        over, the next source is tried, which is the only test of a public
+        instance that can be run from here.
+      */}
+      {blocked && current && (
+        <video
+          key={current.url}
+          data-mirror-player
+          data-mirror-instance={current.instance}
+          src={current.url}
+          className="h-full w-full bg-black"
+          controls
+          playsInline
+          autoPlay={autoplay}
+          onError={() => setSourceStep((n) => n + 1)}
+        />
+      )}
+
+      {blocked && !current && !exhausted && (
+        <div
+          data-mirror-searching
+          className="absolute inset-0 grid place-items-center px-6 text-center text-[13px] leading-[19px] text-yt-sub"
+        >
+          {isAr
+            ? "يوتيوب متحجوب على الشبكة دي — بدوّر على مصدر تاني يشغّل الفيديو…"
+            : "YouTube is blocked on this network — looking for another source for this video…"}
+        </div>
+      )}
 
       {/*
         The switch already happened and the video is playing; this only says
@@ -345,7 +431,18 @@ export default function YouTubePlayer({
         handing over the fix that matches it: a DNS-level filter is the common
         shape of this, and it is the one the user can actually undo.
       */}
-      {blocked && (
+      {blocked && current && (
+        <div
+          data-mirror-note
+          className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 rounded-full bg-black/80 px-3 py-1.5 text-[12px] leading-[17px] text-yt-text"
+        >
+          {isAr
+            ? `يوتيوب متحجوب — الفيديو جاي من ${current.instance}`
+            : `YouTube is blocked — this video is coming from ${current.instance}`}
+        </div>
+      )}
+
+      {blocked && exhausted && (
         <div
           data-reach-blocked
           dir={isAr ? "rtl" : "ltr"}
@@ -357,8 +454,8 @@ export default function YouTubePlayer({
             </p>
             <p className="mt-1.5 text-[13px] leading-[19px] text-yt-sub">
               {isAr
-                ? "جرّبت النطاقين اللي بيشغّلوا الفيديو: youtube.com و youtube-nocookie.com — والاتنين مردّوش، والموقع ده نفسه شغّال عادي. يعني الحجب في الشبكة بتاعتك، مش في التطبيق."
-                : "Both hosts that can play the video — youtube.com and youtube-nocookie.com — refused the connection, while this site itself loads fine. The block is on your network, not in this app."}
+                ? "جرّبت النطاقين اللي بيشغّلوا الفيديو — youtube.com و youtube-nocookie.com — وبعدين جرّبت كل المرايا العامة اللي ممكن تجيب الفيديو من غير يوتيوب، ومحدش منهم رد. والموقع ده نفسه شغّال عادي، يعني الحجب في الشبكة بتاعتك مش في التطبيق."
+                : "Both hosts that can play the video — youtube.com and youtube-nocookie.com — refused, and so did every public mirror that could have served it without YouTube. This site itself loads fine, so the block is on your network, not in this app."}
             </p>
             <div className="mt-3 rounded-lg bg-yt-surface px-3 py-2.5 text-start">
               <p className="text-[13px] font-medium leading-[18px] text-yt-text">

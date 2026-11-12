@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AtChar123handleChar125RouteImport } from './routes/@{$handle}'
 import { Route as ChannelRouteImport } from './routes/channel'
-import { Route as DiagRouteImport } from './routes/diag'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as PlaylistRouteImport } from './routes/playlist'
 import { Route as PoliciesRouteImport } from './routes/policies'
@@ -38,11 +37,6 @@ const AtChar123handleChar125Route = AtChar123handleChar125RouteImport.update({
 const ChannelRoute = ChannelRouteImport.update({
   id: '/channel',
   path: '/channel',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DiagRoute = DiagRouteImport.update({
-  id: '/diag',
-  path: '/diag',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LibraryRoute = LibraryRouteImport.update({
@@ -105,7 +99,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/@{$handle}': typeof AtChar123handleChar125Route
   '/channel': typeof ChannelRouteWithChildren
-  '/diag': typeof DiagRoute
   '/library': typeof LibraryRoute
   '/playlist': typeof PlaylistRoute
   '/policies': typeof PoliciesRoute
@@ -122,7 +115,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/@{$handle}': typeof AtChar123handleChar125Route
   '/channel': typeof ChannelRouteWithChildren
-  '/diag': typeof DiagRoute
   '/library': typeof LibraryRoute
   '/playlist': typeof PlaylistRoute
   '/policies': typeof PoliciesRoute
@@ -140,7 +132,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/@{$handle}': typeof AtChar123handleChar125Route
   '/channel': typeof ChannelRouteWithChildren
-  '/diag': typeof DiagRoute
   '/library': typeof LibraryRoute
   '/playlist': typeof PlaylistRoute
   '/policies': typeof PoliciesRoute
@@ -159,7 +150,6 @@ export interface FileRouteTypes {
     | '/'
     | '/@{$handle}'
     | '/channel'
-    | '/diag'
     | '/library'
     | '/playlist'
     | '/policies'
@@ -176,7 +166,6 @@ export interface FileRouteTypes {
     | '/'
     | '/@{$handle}'
     | '/channel'
-    | '/diag'
     | '/library'
     | '/playlist'
     | '/policies'
@@ -193,7 +182,6 @@ export interface FileRouteTypes {
     | '/'
     | '/@{$handle}'
     | '/channel'
-    | '/diag'
     | '/library'
     | '/playlist'
     | '/policies'
@@ -211,7 +199,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AtChar123handleChar125Route: typeof AtChar123handleChar125Route
   ChannelRoute: typeof ChannelRouteWithChildren
-  DiagRoute: typeof DiagRoute
   LibraryRoute: typeof LibraryRoute
   PlaylistRoute: typeof PlaylistRoute
   PoliciesRoute: typeof PoliciesRoute
@@ -244,13 +231,6 @@ declare module '@tanstack/react-router' {
       path: '/channel'
       fullPath: '/channel'
       preLoaderRoute: typeof ChannelRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/diag': {
-      id: '/diag'
-      path: '/diag'
-      fullPath: '/diag'
-      preLoaderRoute: typeof DiagRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/library': {
@@ -359,7 +339,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AtChar123handleChar125Route: AtChar123handleChar125Route,
   ChannelRoute: ChannelRouteWithChildren,
-  DiagRoute: DiagRoute,
   LibraryRoute: LibraryRoute,
   PlaylistRoute: PlaylistRoute,
   PoliciesRoute: PoliciesRoute,

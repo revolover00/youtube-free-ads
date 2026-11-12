@@ -41,35 +41,78 @@ function check(label, actual, expected) {
  * `fetch`; everything else is delegated to the real one so the app keeps
  * working.
  */
-async function newPage(blocked) {
+async function newPage(blocked, { piped = null } = {}) {
   const page = await browser.newPage();
-  await page.evaluateOnNewDocument((list) => {
-    try {
-      localStorage.clear();
-      sessionStorage.clear();
-    } catch {
-      /* fine */
-    }
-    const real = window.fetch.bind(window);
-    // This sandbox genuinely cannot reach any YouTube host, so "not stubbed"
-    // would mean "blocked" and the open-network case could not exist. Every
-    // YouTube request is therefore answered by the simulation, and only the
-    // app's own same-origin traffic reaches the real fetch.
-    window.fetch = (input, init) => {
-      const url = typeof input === "string" ? input : (input?.url ?? String(input));
-      if (list.some((h) => url.includes(h))) {
-        return Promise.reject(new TypeError("Failed to fetch"));
+  await page.evaluateOnNewDocument(
+    (list, pipedHost) => {
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch {
+        /* fine */
       }
-      if (/youtube\.com|youtube-nocookie\.com|i\.ytimg\.com/.test(url)) {
-        return Promise.resolve(new Response(null, { status: 200 }));
-      }
-      return real(input, init);
-    };
-  }, blocked);
+      // Each mirror attempt is transient by design -- an unplayable source is
+      // replaced within milliseconds -- so attempts are recorded as they
+      // happen rather than caught by polling afterwards.
+      window.__mirrorTries = [];
+      const watch = () => {
+        for (const v of document.querySelectorAll("[data-mirror-player]")) {
+          const src = v.getAttribute("src");
+          const instance = v.getAttribute("data-mirror-instance");
+          if (src && !window.__mirrorTries.some((t) => t.src === src)) {
+            window.__mirrorTries.push({ src, instance });
+          }
+        }
+        if (document.querySelector("[data-mirror-searching]")) window.__searched = true;
+      };
+      new MutationObserver(watch).observe(document, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+      });
+
+      const real = window.fetch.bind(window);
+      // This sandbox genuinely cannot reach any YouTube host, so "not
+      // stubbed" would mean "blocked" and the open-network case could not
+      // exist. Every YouTube request is therefore answered by the
+      // simulation, and only the app's own same-origin traffic reaches the
+      // real fetch.
+      window.fetch = (input, init) => {
+        const url = typeof input === "string" ? input : (input?.url ?? String(input));
+        if (pipedHost && url.includes(pipedHost)) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                videoStreams: [
+                  { url: "https://proxy.example/high", videoOnly: true, itag: 137 },
+                  {
+                    url: "https://proxy.example/muxed360",
+                    videoOnly: false,
+                    itag: 18,
+                    quality: "360p",
+                  },
+                ],
+              }),
+              { status: 200, headers: { "content-type": "application/json" } },
+            ),
+          );
+        }
+        if (list.some((h) => url.includes(h))) {
+          return Promise.reject(new TypeError("Failed to fetch"));
+        }
+        if (/youtube\.com|youtube-nocookie\.com|i\.ytimg\.com|pipedapi|piped\.yt/.test(url)) {
+          return Promise.resolve(new Response(null, { status: 200 }));
+        }
+        return real(input, init);
+      };
+    },
+    blocked,
+    piped,
+  );
   page.on("pageerror", (e) => console.error(`  [page error] ${e.message}`));
   await page.setViewport(VIEWPORT);
   await page.goto(`${BASE}/watch?v=${VIDEO}`, { waitUntil: "networkidle2", timeout: 60000 });
-  await page.waitForSelector("#persistent-player iframe", { timeout: 20000 });
+  await page.waitForSelector("#persistent-player", { timeout: 20000 });
   return page;
 }
 
@@ -87,6 +130,16 @@ async function settleReach(page, { timeout = 15000 } = {}) {
     last = now;
     if (Date.now() > deadline) return;
     await new Promise((r) => setTimeout(r, 400));
+  }
+}
+
+/** The mirror search is several network attempts; it needs real time. */
+async function waitFor(page, selector, timeout = 45000) {
+  try {
+    await page.waitForSelector(selector, { timeout });
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -160,9 +213,30 @@ try {
   await page.close();
 
   // ---- 3. Both embed hosts gone -----------------------------------------
-  console.log("\nboth embed hosts blocked: the block is named, not spun on");
+  console.log("\nboth embed hosts blocked, and no mirror answers either");
   page = await newPage(["www.youtube.com", "www.youtube-nocookie.com", "i.ytimg.com"]);
-  await settleReach(page);
+  check(
+    "the dead embed is not left on screen taking the space",
+    await page.evaluate(() => !document.querySelector("#persistent-player iframe")),
+    true,
+  );
+  check(
+    "the explanation arrives once every source is spent",
+    await waitFor(page, "[data-reach-blocked]"),
+    true,
+  );
+  check(
+    "it went looking for another source before giving up",
+    await page.evaluate(() => window.__searched === true),
+    true,
+  );
+  const tried = await page.evaluate(() => window.__mirrorTries ?? []);
+  check("every mirror was actually tried, not just mentioned", tried.length >= 3, true);
+  check(
+    "and each was asked to serve the bytes itself, never googlevideo",
+    tried.length > 0 && tried.every((t) => /local=true/.test(t.src)),
+    true,
+  );
   const blockedText = await text(page);
   check(
     "the player says the network is the thing blocking it",
@@ -170,6 +244,11 @@ try {
     true,
   );
   check("both hosts tried are named", /youtube-nocookie\.com/i.test(blockedText), true);
+  check(
+    "and it says the mirrors were tried too, so the user is not sent round again",
+    /mirror/i.test(blockedText),
+    true,
+  );
   check(
     "the fix that matches a DNS filter is given, with real addresses",
     /1\.1\.1\.1/.test(blockedText) && /one\.one\.one\.one/.test(blockedText),
@@ -209,6 +288,33 @@ try {
     false,
   );
   check("and the player is not moved on a guess", await embedHost(page), "www.youtube.com");
+  await page.close();
+
+  // ---- 4b. A mirror that does answer ------------------------------------
+  // The whole point of the exercise: YouTube is unreachable, but a front-end
+  // the network does not block hands over a playable file, and the video
+  // plays from there.
+  console.log("\na reachable mirror plays the video that YouTube cannot");
+  page = await newPage(["www.youtube.com", "www.youtube-nocookie.com", "i.ytimg.com"], {
+    piped: "pipedapi.kavin.rocks",
+  });
+  // The fixture URL is deliberately unplayable, so the element moves past it
+  // the moment it fails -- which is the failover doing its job. What matters
+  // is what it reached for first, and who it named.
+  await waitFor(page, "[data-reach-blocked]");
+  const picks = await page.evaluate(() => window.__mirrorTries ?? []);
+  check("a real player appeared", picks.length > 0, true);
+  check(
+    "the instance that answered is tried before the ones that only might",
+    picks[0]?.src ?? "",
+    "https://proxy.example/muxed360",
+  );
+  check(
+    "the source is named rather than passed off as YouTube",
+    picks[0]?.instance ?? "",
+    "pipedapi.kavin.rocks",
+  );
+  check("when one source fails the next is tried, not the whole idea", picks.length >= 2, true);
   await page.close();
 
   // ---- 5. A filter that answers instead of refusing ----------------------

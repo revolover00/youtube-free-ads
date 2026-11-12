@@ -31,6 +31,20 @@ const browser = await puppeteer.launch({
   ],
 });
 const page = await browser.newPage();
+// This harness is about the player holding still while playback messages
+// arrive, which presumes a network where the embed can load at all. The
+// sandbox genuinely cannot reach YouTube, and the player now (correctly)
+// takes the dead embed down and goes hunting for a mirror instead -- so the
+// reachability probe is answered as an open network, the case under test.
+await page.evaluateOnNewDocument(() => {
+  const real = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const url = typeof input === "string" ? input : (input?.url ?? String(input));
+    return /youtube\.com|youtube-nocookie\.com|i\.ytimg\.com/.test(url)
+      ? Promise.resolve(new Response(null, { status: 200 }))
+      : real(input, init);
+  };
+});
 await page.setViewport({ width: 1440, height: 1000 });
 await page.goto("http://127.0.0.1:3000/watch?v=dQw4w9WgXcQ", {
   waitUntil: "networkidle2",
