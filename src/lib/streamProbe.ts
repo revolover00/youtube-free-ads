@@ -110,14 +110,14 @@ export async function probeStreams(videoId: string, attempts: number): Promise<S
         out.playerJs = /\/s\/player\/[A-Za-z0-9_/.-]+base\.js/.exec(html)?.[0] ?? "";
       }
       const parsed = extractJsonVar(html, "ytInitialPlayerResponse") as Json | null;
-      const streaming = parsed ? obj(parsed.streamingData) : {};
+      const streaming = parsed ? obj(parsed["streamingData"]) : {};
       const hasStreaming =
-        Array.isArray(streaming.formats) || Array.isArray(streaming.adaptiveFormats);
+        Array.isArray(streaming["formats"]) || Array.isArray(streaming["adaptiveFormats"]);
       out.tries.push({
         status: res.status,
         kb: Math.round(html.length / 1024),
         botWall: html.includes("Sign in to confirm"),
-        playability: str(obj(parsed?.playabilityStatus).status) || "none",
+        playability: str(obj(parsed?.["playabilityStatus"])["status"]) || "none",
         hasStreaming,
       });
       if (hasStreaming && parsed) player = parsed;
@@ -135,28 +135,28 @@ export async function probeStreams(videoId: string, attempts: number): Promise<S
   if (!player) return out;
   out.got = true;
 
-  const streaming = obj(player.streamingData);
-  const muxed = Array.isArray(streaming.formats) ? (streaming.formats as Json[]) : [];
-  const adaptive = Array.isArray(streaming.adaptiveFormats)
-    ? (streaming.adaptiveFormats as Json[])
+  const streaming = obj(player["streamingData"]);
+  const muxed = Array.isArray(streaming["formats"]) ? (streaming["formats"] as Json[]) : [];
+  const adaptive = Array.isArray(streaming["adaptiveFormats"])
+    ? (streaming["adaptiveFormats"] as Json[])
     : [];
   out.adaptiveCount = adaptive.length;
 
   out.formats = muxed.map((f) => ({
-    itag: num(f.itag),
-    mime: str(f.mimeType).slice(0, 44),
-    quality: str(f.qualityLabel),
-    bitrate: num(f.bitrate),
-    sizeMb: Math.round(num(f.contentLength) / 1048576),
-    hasUrl: !!str(f.url),
-    hasCipher: !!str(f.signatureCipher),
-    hasN: /[?&]n=/.test(str(f.url) || str(f.signatureCipher)),
+    itag: num(f["itag"]),
+    mime: str(f["mimeType"]).slice(0, 44),
+    quality: str(f["qualityLabel"]),
+    bitrate: num(f["bitrate"]),
+    sizeMb: Math.round(num(f["contentLength"]) / 1048576),
+    hasUrl: !!str(f["url"]),
+    hasCipher: !!str(f["signatureCipher"]),
+    hasN: /[?&]n=/.test(str(f["url"]) || str(f["signatureCipher"])),
   }));
 
   // Prefer the classic 360p muxed file: one URL, audio included, plays in a
   // plain <video> with no MSE work at all.
-  const pick = muxed.find((f) => num(f.itag) === 18) ?? muxed[0];
-  const direct = pick ? str(pick.url) : "";
+  const pick = muxed.find((f) => num(f["itag"]) === 18) ?? muxed[0];
+  const direct = pick ? str(pick["url"]) : "";
 
   if (!pick) {
     out.speed = { itag: 0, status: 0, kb: 0, ms: 0, kbps: 0, note: "no muxed format offered" };
@@ -164,7 +164,7 @@ export async function probeStreams(videoId: string, attempts: number): Promise<S
   }
   if (!direct) {
     out.speed = {
-      itag: num(pick.itag),
+      itag: num(pick["itag"]),
       status: 0,
       kb: 0,
       ms: 0,
@@ -182,7 +182,7 @@ export async function probeStreams(videoId: string, attempts: number): Promise<S
     const buf = await res.arrayBuffer();
     const ms = Math.max(1, Date.now() - started);
     out.speed = {
-      itag: num(pick.itag),
+      itag: num(pick["itag"]),
       status: res.status,
       kb: Math.round(buf.byteLength / 1024),
       ms,
@@ -191,7 +191,7 @@ export async function probeStreams(videoId: string, attempts: number): Promise<S
     };
   } catch (e) {
     out.speed = {
-      itag: num(pick.itag),
+      itag: num(pick["itag"]),
       status: 0,
       kb: 0,
       ms: Date.now() - started,
