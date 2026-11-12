@@ -19,6 +19,8 @@
  * upscaling, and the real moment.
  */
 
+import { DEFAULT_EMBED_HOST, storedEmbedHost } from "./reach";
+
 const ATTR = "data-shot-mode";
 const LAYER_ID = "yt-shot-layer";
 const CARD_ID = "yt-shot-card";
@@ -164,7 +166,9 @@ function mountStage(videoId: string, at: number): HTMLIFrameElement {
   const frame = document.createElement("iframe");
   frame.allow = "autoplay; encrypted-media";
   frame.setAttribute("frameborder", "0");
-  frame.src = `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+  // Same host the page player settled on: on a network that blocks
+  // youtube.com, a stage built on it would photograph an error page.
+  frame.src = `https://${storedEmbedHost() ?? DEFAULT_EMBED_HOST}/embed/${videoId}?${params.toString()}`;
   Object.assign(frame.style, {
     width: "100%",
     height: "100%",

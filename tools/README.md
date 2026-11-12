@@ -27,6 +27,24 @@ Both details matter: the script must run from the repo root so Node can resolve
 `@sparticuz/chromium`, and `LD_LIBRARY_PATH` must point at the extracted libs or
 Chromium fails with `libnspr4.so: cannot open shared object file`.
 
+## reach-test.mjs
+
+Checks what the player does on a network that blocks YouTube, which is not one
+behaviour but four: stay put on an open network, move to
+`www.youtube-nocookie.com` when only `www.youtube.com` is filtered, name the
+block and give the DNS fix when both embed hosts are gone, and conclude
+nothing at all when this origin is unreachable too.
+
+```sh
+YT_UI_FIXTURE=1 npm run dev -- --host 0.0.0.0 --port 3000
+BASE_URL=http://127.0.0.1:3000 LD_LIBRARY_PATH=/tmp/allibs/lib node tools/reach-test.mjs
+```
+
+The network is simulated by shadowing `fetch` before the app's first script
+runs. It has to answer *every* YouTube request, not just the blocked ones:
+this sandbox cannot reach any YouTube host, so "not stubbed" would mean
+"blocked" and the open-network case could not be expressed.
+
 ## storyboard-test.mjs
 
 Asserts the storyboard spec parsing and frame addressing in
