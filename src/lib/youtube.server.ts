@@ -1,3 +1,4 @@
+// NOTE: YouTube InnerTube proxy is rate-limited via Vercel Firewall recommended (or add Upstash). Cache 500 entries protects cost.
 /**
  * Server-side YouTube data layer.
  *

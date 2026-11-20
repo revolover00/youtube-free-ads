@@ -866,7 +866,7 @@ export default function App() {
       }
       window.scrollTo({ top: 0 });
     },
-    [shortsItems, urlVideoId, routerNav],
+    [shortsItems, urlVideoId, routerNav, setRoute],
   );
 
   const cancelAutoplay = () => {
