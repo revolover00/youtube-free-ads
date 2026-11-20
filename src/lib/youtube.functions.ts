@@ -7,14 +7,14 @@ import type { Page, TrendingPage } from "./youtube.server";
 const queryInput = (data: unknown) => z.object({ q: z.string().min(1) }).parse(data);
 
 export const searchVideosFn = createServerFn({ method: "POST" })
-  .inputValidator(queryInput)
+  .validator(queryInput)
   .handler(async ({ data }): Promise<PipedVideo[]> => {
     const { search } = await import("./youtube.server");
     return search(data.q);
   });
 
 export const searchPageFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     z.object({ q: z.string().min(1), continuation: z.string().nullable().optional() }).parse(data),
   )
   .handler(async ({ data }): Promise<Page> => {
@@ -23,7 +23,7 @@ export const searchPageFn = createServerFn({ method: "POST" })
   });
 
 export const suggestionsFn = createServerFn({ method: "POST" })
-  .inputValidator(queryInput)
+  .validator(queryInput)
   .handler(async ({ data }): Promise<string[]> => {
     const { suggest } = await import("./youtube.server");
     return suggest(data.q);
@@ -37,7 +37,7 @@ export const trendingFn = createServerFn({ method: "POST" }).handler(
 );
 
 export const trendingPageFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     z.object({ cursors: z.array(z.string().nullable()).optional() }).parse(data ?? {}),
   )
   .handler(async ({ data }): Promise<TrendingPage> => {
@@ -46,42 +46,42 @@ export const trendingPageFn = createServerFn({ method: "POST" })
   });
 
 export const videoDetailsFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ id: z.string().min(6) }).parse(data))
+  .validator((data: unknown) => z.object({ id: z.string().min(6) }).parse(data))
   .handler(async ({ data }): Promise<StreamData> => {
     const { videoDetails } = await import("./youtube.server");
     return videoDetails(data.id);
   });
 
 export const playlistFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ id: z.string().min(2) }).parse(data))
+  .validator((data: unknown) => z.object({ id: z.string().min(2) }).parse(data))
   .handler(async ({ data }): Promise<PlaylistData> => {
     const { playlist } = await import("./youtube.server");
     return playlist(data.id);
   });
 
 export const channelFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .validator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
   .handler(async ({ data }): Promise<ChannelData> => {
     const { channel } = await import("./youtube.server");
     return channel(data.id);
   });
 
 export const channelFeedFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
+  .validator((data: unknown) => z.object({ id: z.string().min(1) }).parse(data))
   .handler(async ({ data }): Promise<PipedVideo[]> => {
     const { channelFeed } = await import("./youtube.server");
     return channelFeed(data.id);
   });
 
 export const browsePageFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ continuation: z.string().min(1) }).parse(data))
+  .validator((data: unknown) => z.object({ continuation: z.string().min(1) }).parse(data))
   .handler(async ({ data }): Promise<Page> => {
     const { browsePage } = await import("./youtube.server");
     return browsePage(data.continuation);
   });
 
 export const commentsPageFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ token: z.string().min(1) }).parse(data))
+  .validator((data: unknown) => z.object({ token: z.string().min(1) }).parse(data))
   .handler(
     async ({
       data,
@@ -92,7 +92,7 @@ export const commentsPageFn = createServerFn({ method: "POST" })
   );
 
 export const homeCandidatesFn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     z
       .object({
         channelIds: z.array(z.string()),
